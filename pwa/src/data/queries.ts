@@ -24,6 +24,8 @@ export type JobRow = {
   pricing_snapshot: { total?: number; subtotal?: number; tax?: number } | null;
   state_history?: unknown;
   reschedule_count?: number;
+  weather_safety?: "good" | "marginal" | "unsafe" | null;
+  weather_evaluated_at?: string | null;
   farmer: {
     id: string;
     name: string;
@@ -39,7 +41,7 @@ export async function listJobs(opts: { from?: string; to?: string; state?: strin
   let q = supabase
     .from("jobs")
     .select(
-      "id, number, crop, area_acres, scheduled_date, state, village, pesticide_name, assigned_pilot_id, assigned_drone_id, override_reason, pricing_snapshot, farmer:farmers!farmer_id(id, name, phone, village)",
+      "id, number, crop, area_acres, scheduled_date, state, village, pesticide_name, assigned_pilot_id, assigned_drone_id, override_reason, pricing_snapshot, weather_safety, weather_evaluated_at, farmer:farmers!farmer_id(id, name, phone, village)",
     )
     .order("scheduled_date", { ascending: true });
   if (opts.from) q = q.gte("scheduled_date", opts.from);

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Wheat, ChevronRight, Plus, Filter } from "lucide-react";
+import { Wheat, ChevronRight, Plus, Filter, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,24 @@ import { Button } from "@/components/ui/button";
 import { useSupabaseQuery } from "@/hooks/useSupabaseQuery";
 import { listJobs } from "@/data/queries";
 import type { JobRow } from "@/data/queries";
+
+const TERMINAL_STATES = new Set(["complete", "invoiced", "paid", "cancelled", "failed"]);
+
+function WeatherPill({ safety }: { safety?: "good" | "marginal" | "unsafe" | null }) {
+  if (!safety) return null;
+  const map = {
+    good:     { Icon: CheckCircle2,  cls: "bg-mint-50 text-mint-700 border-mint-200",   label: "Spray-safe" },
+    marginal: { Icon: AlertTriangle, cls: "bg-amber-50 text-amber-700 border-amber-200", label: "Marginal" },
+    unsafe:   { Icon: XCircle,       cls: "bg-red-50 text-red-700 border-red-200",       label: "Unsafe" },
+  } as const;
+  const { Icon, cls, label } = map[safety];
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${cls}`}>
+      <Icon className="h-2.5 w-2.5" />
+      {label}
+    </span>
+  );
+}
 
 const STATE_FILTERS = [
   "all",
@@ -112,13 +130,14 @@ export default function Jobs() {
                       <Wheat className="h-5 w-5" />
                     </IconTile>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-sm font-semibold text-ink-900 truncate">
                           {j.farmer?.name ?? "Walk-in"}
                         </span>
                         <Badge tone={stateTone[j.state] ?? "neutral"}>
                           {stateLabel[j.state] ?? j.state}
                         </Badge>
+                        {!TERMINAL_STATES.has(j.state) && <WeatherPill safety={j.weather_safety} />}
                       </div>
                       <div className="text-xs text-ink-500 truncate">
                         {j.crop} · {j.area_acres} ac · {j.village ?? j.farmer?.village} · {j.scheduled_date}
