@@ -335,7 +335,7 @@ export default function JobDetail() {
         </div>
 
         {/* Weather */}
-        <WeatherCard jobId={j.id} bookingDate={j.scheduled_date} />
+        <WeatherCard jobId={j.id} bookingDate={j.scheduled_date} village={j.village} />
 
         {/* Crew */}
         <Card>

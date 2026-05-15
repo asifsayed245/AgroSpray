@@ -3,7 +3,9 @@ import { Cloud, Wind, Droplets, RefreshCw, AlertTriangle, CheckCircle2, XCircle,
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useSupabaseQuery } from "@/hooks/useSupabaseQuery";
+import { supabase } from "@/lib/supabase";
 import {
   getLatestWeatherForJob,
   refreshWeatherForJob,
@@ -11,6 +13,25 @@ import {
   type WeatherSafety,
   type WeatherSnapshot,
 } from "@/data/queries";
+
+// Accepts: "18.5, 73.9", "lat=18.5 lng=73.9", Google Maps URLs like
+//   https://www.google.com/maps/@18.51,73.91,15z
+//   https://maps.google.com/?q=18.51,73.91
+//   https://goo.gl/maps/... (won't parse; user needs to expand)
+function parseCoords(raw: string): { lat: number; lng: number } | null {
+  if (!raw) return null;
+  const matches = raw.match(/-?\d+(?:\.\d+)?/g);
+  if (!matches || matches.length < 2) return null;
+  // Find the first two numbers that look like a sensible lat/lng pair.
+  for (let i = 0; i < matches.length - 1; i++) {
+    const a = parseFloat(matches[i]);
+    const b = parseFloat(matches[i + 1]);
+    if (Math.abs(a) <= 90 && Math.abs(b) <= 180 && !(a === 0 && b === 0)) {
+      return { lat: a, lng: b };
+    }
+  }
+  return null;
+}
 
 const SAFETY_LABEL: Record<WeatherSafety, string> = {
   good: "Spray-safe",
@@ -55,11 +76,22 @@ function shortDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
-export function WeatherCard({ jobId, bookingDate }: { jobId: string; bookingDate: string }) {
+export function WeatherCard({
+  jobId,
+  bookingDate,
+  village,
+}: {
+  jobId: string;
+  bookingDate: string;
+  village?: string | null;
+}) {
   const q = useSupabaseQuery(() => getLatestWeatherForJob(jobId), [jobId]);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [noLocation, setNoLocation] = useState(false);
+  const [coordsInput, setCoordsInput] = useState("");
+  const [savingCoords, setSavingCoords] = useState(false);
+  const [coordsError, setCoordsError] = useState<string | null>(null);
 
   const snap = q.data as WeatherSnapshot | null;
 
@@ -101,6 +133,29 @@ export function WeatherCard({ jobId, bookingDate }: { jobId: string; bookingDate
     );
   }
 
+  async function saveCoords() {
+    const parsed = parseCoords(coordsInput);
+    if (!parsed) {
+      setCoordsError("Couldn't read coordinates. Try \"18.51, 73.92\" or a Google Maps link.");
+      return;
+    }
+    setSavingCoords(true);
+    setCoordsError(null);
+    const { error: e } = await supabase
+      .from("jobs")
+      .update({ location_lat: parsed.lat, location_lng: parsed.lng })
+      .eq("id", jobId);
+    if (e) {
+      setSavingCoords(false);
+      setCoordsError(e.message);
+      return;
+    }
+    setNoLocation(false);
+    setCoordsInput("");
+    await doRefresh();
+    setSavingCoords(false);
+  }
+
   if (noLocation) {
     return (
       <Card>
@@ -109,8 +164,26 @@ export function WeatherCard({ jobId, bookingDate }: { jobId: string; bookingDate
           <MapPin className="h-4 w-4 text-amber-700" />
         </CardHeader>
         <div className="rounded-xl bg-amber-50/60 border border-amber-100 px-3 py-2 text-xs text-amber-800">
-          Set a location for this job to see weather. We couldn't resolve "
-          <span className="font-medium">{bookingDate}</span>" to coordinates.
+          {village
+            ? <>Couldn't find <span className="font-medium">"{village}"</span> on the map. Set coordinates manually below.</>
+            : "No location set for this job. Paste coordinates below to see weather."}
+        </div>
+        <div className="mt-3 space-y-2">
+          <Input
+            label="Coordinates or Google Maps link"
+            placeholder="18.51, 73.92  —  or paste a maps.google.com URL"
+            value={coordsInput}
+            onChange={(e) => setCoordsInput(e.target.value)}
+            hint="Open Google Maps → long-press the field → copy the lat/lng row, paste here."
+          />
+          {coordsError && (
+            <div className="rounded-xl bg-red-50/60 border border-red-100 px-3 py-2 text-xs text-danger">
+              {coordsError}
+            </div>
+          )}
+          <Button size="sm" block disabled={savingCoords || !coordsInput.trim()} onClick={saveCoords}>
+            {savingCoords ? "Saving…" : "Save & fetch weather"}
+          </Button>
         </div>
       </Card>
     );
