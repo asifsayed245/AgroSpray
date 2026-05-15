@@ -27,6 +27,11 @@ const T = {
   consent:
     "Before we start: we'll store your name, phone, location and booking details to fulfil the spray and meet DGCA + DPDP rules. Data stays in India.\n\nTap *Accept* to continue.",
   consentAccepted: "Great, thanks! Let's start.",
+  askName: "What's your *full name*? (so our pilot knows who to call)",
+  askPhone:
+    "What's the *phone number* we should reach you on?\n(10-digit Indian mobile, e.g. `9876543210`)",
+  hiAgain: (name: string) =>
+    `Welcome back, ${name}! 👋 Let's get your next spray booked.`,
   askCrop: "What's the crop?",
   askArea: "How many *acres* are we spraying?\n(Just type the number — e.g. `12`)",
   askDate: "Which day works for you?",
@@ -34,6 +39,8 @@ const T = {
   askSprayType: "What kind of spray?",
   askConfirm: (d: Draft) =>
     `*Please confirm:*\n` +
+    `• Name: ${d.name ?? "—"}\n` +
+    `• Phone: ${d.phone ?? "—"}\n` +
     `• Crop: ${d.crop}\n` +
     `• Area: ${d.area_acres} acres\n` +
     `• Date: ${d.scheduled_date}\n` +
@@ -50,15 +57,30 @@ const T = {
     "Sorry, I didn't catch that. Send /start to begin a new booking, or /cancel to abort the current one.",
   cancelled: "Cancelled. Send /start anytime to book a new spray.",
   notNumber: "Please send a number — e.g. `12` for 12 acres.",
+  notValidName: "Please send your full name (at least 2 letters).",
+  notValidPhone: "Please send a valid 10-digit Indian mobile number — e.g. `9876543210`.",
 };
 
 type Draft = {
+  name?: string;
+  phone?: string;
   crop?: string;
   area_acres?: number;
   scheduled_date?: string;
   village?: string;
   spray_type?: string;
 };
+
+const NAME_RE = /[A-Za-zऀ-ॿ]{2,}/;
+const PHONE_RE = /^[6-9]\d{9}$/;
+function normalisePhone(raw: string): string | null {
+  const digits = raw.replace(/\D/g, "");
+  // accept 10-digit Indian, 11-digit (starts with 0), 12-digit (starts with 91)
+  if (PHONE_RE.test(digits)) return digits;
+  if (digits.length === 11 && digits.startsWith("0") && PHONE_RE.test(digits.slice(1))) return digits.slice(1);
+  if (digits.length === 12 && digits.startsWith("91") && PHONE_RE.test(digits.slice(2))) return digits.slice(2);
+  return null;
+}
 
 const CROPS = ["cotton", "wheat", "soybean", "paddy", "maize", "sugarcane", "chilli", "tomato"];
 const SPRAY_TYPES = ["insecticide", "herbicide", "fungicide", "nutrient"];
@@ -229,17 +251,36 @@ async function handleInput(
     return reply(token, tenantId, chatId, T.cancelled);
   }
   if (lower === "/start") {
-    if (session.consent_at) {
-      await setSession(session.id, { state: "awaiting_crop", draft: {} });
+    let knownName: string | null = null;
+    if (session.farmer_id) {
+      const { data: f } = await supa
+        .from("farmers")
+        .select("name")
+        .eq("id", session.farmer_id)
+        .maybeSingle();
+      if (f?.name && f.name !== "Telegram user") knownName = f.name as string;
+    }
+
+    if (!session.consent_at) {
+      await setSession(session.id, { state: "awaiting_consent", draft: {} });
       await reply(token, tenantId, chatId, T.welcome(firstName));
-      return reply(token, tenantId, chatId, T.askCrop, {
-        reply_markup: buttonGrid(CROPS, "crop"),
+      return reply(token, tenantId, chatId, T.consent, {
+        reply_markup: inlineKeyboard([[{ text: "✅ Accept", data: "consent:accept" }]]),
       });
     }
-    await setSession(session.id, { state: "awaiting_consent", draft: {} });
-    await reply(token, tenantId, chatId, T.welcome(firstName));
-    return reply(token, tenantId, chatId, T.consent, {
-      reply_markup: inlineKeyboard([[{ text: "✅ Accept", data: "consent:accept" }]]),
+
+    if (!knownName) {
+      // Returning user but no usable name on file — ask again so the admin
+      // sees a real name on the booking.
+      await setSession(session.id, { state: "awaiting_name", draft: {} });
+      await reply(token, tenantId, chatId, T.welcome(firstName));
+      return reply(token, tenantId, chatId, T.askName);
+    }
+
+    await setSession(session.id, { state: "awaiting_crop", draft: { name: knownName } });
+    await reply(token, tenantId, chatId, T.hiAgain(knownName));
+    return reply(token, tenantId, chatId, T.askCrop, {
+      reply_markup: buttonGrid(CROPS, "crop"),
     });
   }
 
@@ -249,16 +290,38 @@ async function handleInput(
     case "awaiting_consent": {
       if (callbackData === "consent:accept" || lower === "accept") {
         await setSession(session.id, {
-          state: "awaiting_crop",
+          state: "awaiting_name",
           consent_at: new Date().toISOString(),
         });
         await reply(token, tenantId, chatId, T.consentAccepted);
-        return reply(token, tenantId, chatId, T.askCrop, {
-          reply_markup: buttonGrid(CROPS, "crop"),
-        });
+        return reply(token, tenantId, chatId, T.askName);
       }
       return reply(token, tenantId, chatId, T.consent, {
         reply_markup: inlineKeyboard([[{ text: "✅ Accept", data: "consent:accept" }]]),
+      });
+    }
+    case "awaiting_name": {
+      const candidate = (text ?? "").trim();
+      if (!candidate || !NAME_RE.test(candidate)) {
+        return reply(token, tenantId, chatId, T.notValidName);
+      }
+      await setSession(session.id, {
+        state: "awaiting_phone",
+        draft: { ...draft, name: candidate },
+      });
+      return reply(token, tenantId, chatId, T.askPhone);
+    }
+    case "awaiting_phone": {
+      const phone = normalisePhone(text ?? "");
+      if (!phone) {
+        return reply(token, tenantId, chatId, T.notValidPhone);
+      }
+      await setSession(session.id, {
+        state: "awaiting_crop",
+        draft: { ...draft, phone },
+      });
+      return reply(token, tenantId, chatId, T.askCrop, {
+        reply_markup: buttonGrid(CROPS, "crop"),
       });
     }
     case "awaiting_crop": {
