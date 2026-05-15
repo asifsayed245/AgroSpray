@@ -47,6 +47,9 @@ pnpm-debug.log*
 graphify-out/
 .graphify/
 
+# stray skill / agent scratch
+output/
+
 # Misc
 *.pem
 .cache/

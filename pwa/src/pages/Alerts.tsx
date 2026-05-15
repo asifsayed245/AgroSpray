@@ -93,7 +93,12 @@ export default function Alerts() {
               <Card>
                 <div className="row">
                   <IconTile
-                    tone={n.category === "incident_reported" ? "danger" : n.category === "compliance_block" ? "warn" : "brand"}
+                    tone={
+                      n.category === "incident_reported" ? "danger"
+                      : n.category === "weather.warning" ? "warn"
+                      : n.category === "compliance_block" ? "warn"
+                      : "brand"
+                    }
                     size="sm"
                   >
                     {n.category === "incident_reported" ? <AlertCircle className="h-4 w-4" /> : <Bell className="h-4 w-4" />}

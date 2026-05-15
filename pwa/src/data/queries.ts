@@ -351,3 +351,57 @@ export async function replyToQuery(queryId: string, reply: string) {
 export async function closeQuery(queryId: string) {
   return supabase.rpc("close_farmer_query", { p_query_id: queryId });
 }
+
+// ---------- Chunk E: weather forecast + safety ----------
+
+export type WeatherSafety = "good" | "marginal" | "unsafe";
+
+export type WeatherDay = {
+  date: string;
+  t_max: number;
+  t_min: number;
+  wind_max: number;
+  rain_mm: number;
+  rain_pct: number;
+  safety: WeatherSafety;
+};
+
+export type WeatherSnapshot = {
+  id: string;
+  job_id: string;
+  lat: number;
+  lng: number;
+  source: string;
+  daily: WeatherDay[];
+  booking_date_safety: WeatherSafety;
+  fetched_at: string;
+};
+
+export async function getLatestWeatherForJob(jobId: string) {
+  return supabase
+    .from("weather_snapshots")
+    .select("id, job_id, lat, lng, source, daily, booking_date_safety, fetched_at")
+    .eq("job_id", jobId)
+    .order("fetched_at", { ascending: false })
+    .limit(1)
+    .maybeSingle()
+    .returns<WeatherSnapshot | null>();
+}
+
+export async function refreshWeatherForJob(jobId: string) {
+  return supabase.functions.invoke("fetch-weather", {
+    body: { job_id: jobId, force: true },
+  });
+}
+
+export async function weatherAlertsCount() {
+  const today = new Date().toISOString().slice(0, 10);
+  const horizon = new Date(Date.now() + 7 * 86400e3).toISOString().slice(0, 10);
+  return supabase
+    .from("jobs")
+    .select("id", { count: "exact", head: true })
+    .in("state", ["confirmed", "crew_assigned", "in_progress"])
+    .in("weather_safety", ["marginal", "unsafe"])
+    .gte("scheduled_date", today)
+    .lte("scheduled_date", horizon);
+}

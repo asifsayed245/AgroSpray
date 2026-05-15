@@ -3,10 +3,10 @@ import {
   ShieldCheck,
   Plane,
   Calendar,
-  Receipt,
   Wheat,
   ChevronRight,
   AlertCircle,
+  Cloud,
 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { PrimaryStatCard } from "@/components/layout/PrimaryStatCard";
@@ -17,7 +17,7 @@ import { StatArc } from "@/components/ui/stat-arc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useSupabaseQuery } from "@/hooks/useSupabaseQuery";
-import { dashboardSummary, listJobs, listComplianceBlocks } from "@/data/queries";
+import { dashboardSummary, listJobs, listComplianceBlocks, weatherAlertsCount } from "@/data/queries";
 import { inr } from "@/lib/utils";
 
 const stateTone: Record<string, Parameters<typeof Badge>[0]["tone"]> = {
@@ -54,6 +54,10 @@ const stateLabel: Record<string, string> = {
 
 export default function Dashboard() {
   const summaryQ = useSupabaseQuery(async () => ({ data: await dashboardSummary(), error: null }));
+  const weatherQ = useSupabaseQuery(async () => {
+    const { count, error } = await weatherAlertsCount();
+    return { data: count ?? 0, error };
+  });
   const today = new Date().toISOString().slice(0, 10);
   const jobsQ = useSupabaseQuery(() => listJobs({ from: today, to: today }), [today]);
   const blocksQ = useSupabaseQuery(listComplianceBlocks);
@@ -93,7 +97,11 @@ export default function Dashboard() {
           </TabsList>
 
           <TabsContent value="ops" className="space-y-4">
-            <QuickGrid blocks={blocks.length} slotsBooked={summary.slotsBooked} />
+            <QuickGrid
+              blocks={blocks.length}
+              slotsBooked={summary.slotsBooked}
+              weatherAlerts={(weatherQ.data as number | null) ?? 0}
+            />
             <TodaysJobs jobs={jobs} loading={jobsQ.loading} />
           </TabsContent>
 
@@ -107,12 +115,20 @@ export default function Dashboard() {
   );
 }
 
-function QuickGrid({ blocks, slotsBooked }: { blocks: number; slotsBooked: number }) {
+function QuickGrid({
+  blocks,
+  slotsBooked,
+  weatherAlerts,
+}: {
+  blocks: number;
+  slotsBooked: number;
+  weatherAlerts: number;
+}) {
   const items = [
     { to: "/compliance", icon: ShieldCheck, label: "Compliance", count: blocks, tone: blocks > 0 ? "warn" : ("brand" as const) },
+    { to: "/jobs?weather=alert", icon: Cloud, label: "Weather", count: weatherAlerts, tone: weatherAlerts > 0 ? ("warn" as const) : ("brand" as const) },
     { to: "/fleet", icon: Plane, label: "Drone fleet", count: "Fleet", tone: "brand" as const },
     { to: "/slots", icon: Calendar, label: "Schedule", count: slotsBooked, tone: "brand" as const },
-    { to: "/audit", icon: Receipt, label: "Audit", count: "Open", tone: "brand" as const },
   ];
   return (
     <div className="grid grid-cols-4 gap-2">

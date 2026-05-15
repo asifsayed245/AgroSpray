@@ -744,6 +744,9 @@ export type Database = {
           updated_at: string
           version: number
           village: string | null
+          weather_evaluated_at: string | null
+          weather_last_notified_safety: string | null
+          weather_safety: string | null
         }
         Insert: {
           area: number
@@ -773,6 +776,9 @@ export type Database = {
           updated_at?: string
           version?: number
           village?: string | null
+          weather_evaluated_at?: string | null
+          weather_last_notified_safety?: string | null
+          weather_safety?: string | null
         }
         Update: {
           area?: number
@@ -802,6 +808,9 @@ export type Database = {
           updated_at?: string
           version?: number
           village?: string | null
+          weather_evaluated_at?: string | null
+          weather_last_notified_safety?: string | null
+          weather_safety?: string | null
         }
         Relationships: [
           {
@@ -1392,6 +1401,60 @@ export type Database = {
         }
         Relationships: []
       }
+      weather_snapshots: {
+        Row: {
+          booking_date_safety: string
+          daily: Json
+          fetched_at: string
+          hourly: Json | null
+          id: string
+          job_id: string
+          lat: number
+          lng: number
+          source: string
+          tenant_id: string
+        }
+        Insert: {
+          booking_date_safety: string
+          daily: Json
+          fetched_at?: string
+          hourly?: Json | null
+          id?: string
+          job_id: string
+          lat: number
+          lng: number
+          source?: string
+          tenant_id: string
+        }
+        Update: {
+          booking_date_safety?: string
+          daily?: Json
+          fetched_at?: string
+          hourly?: Json | null
+          id?: string
+          job_id?: string
+          lat?: number
+          lng?: number
+          source?: string
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weather_snapshots_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weather_snapshots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wishlist_entries: {
         Row: {
           area_acres: number | null
@@ -1514,6 +1577,9 @@ export type Database = {
           updated_at: string
           version: number
           village: string | null
+          weather_evaluated_at: string | null
+          weather_last_notified_safety: string | null
+          weather_safety: string | null
         }
         SetofOptions: {
           from: "*"
@@ -1553,6 +1619,9 @@ export type Database = {
           updated_at: string
           version: number
           village: string | null
+          weather_evaluated_at: string | null
+          weather_last_notified_safety: string | null
+          weather_safety: string | null
         }
         SetofOptions: {
           from: "*"
@@ -1677,6 +1746,9 @@ export type Database = {
           updated_at: string
           version: number
           village: string | null
+          weather_evaluated_at: string | null
+          weather_last_notified_safety: string | null
+          weather_safety: string | null
         }
         SetofOptions: {
           from: "*"
@@ -1715,6 +1787,9 @@ export type Database = {
           updated_at: string
           version: number
           village: string | null
+          weather_evaluated_at: string | null
+          weather_last_notified_safety: string | null
+          weather_safety: string | null
         }
         SetofOptions: {
           from: "*"
@@ -1874,6 +1949,9 @@ export type Database = {
           updated_at: string
           version: number
           village: string | null
+          weather_evaluated_at: string | null
+          weather_last_notified_safety: string | null
+          weather_safety: string | null
         }
         SetofOptions: {
           from: "*"
@@ -1947,6 +2025,9 @@ export type Database = {
           updated_at: string
           version: number
           village: string | null
+          weather_evaluated_at: string | null
+          weather_last_notified_safety: string | null
+          weather_safety: string | null
         }
         SetofOptions: {
           from: "*"
@@ -2020,6 +2101,9 @@ export type Database = {
           updated_at: string
           version: number
           village: string | null
+          weather_evaluated_at: string | null
+          weather_last_notified_safety: string | null
+          weather_safety: string | null
         }
         SetofOptions: {
           from: "*"
@@ -2027,6 +2111,10 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      tg_apply_weather_snapshot: {
+        Args: { p_job_id: string; p_safety: string }
+        Returns: Json
       }
       tg_capture_query: {
         Args: {
@@ -2043,6 +2131,14 @@ export type Database = {
       tg_finalize_booking: {
         Args: { p_telegram_chat_id: string; p_tenant_id: string }
         Returns: Json
+      }
+      tg_mark_weather_notified: {
+        Args: { p_job_id: string; p_safety: string }
+        Returns: undefined
+      }
+      tg_set_job_location: {
+        Args: { p_job_id: string; p_lat: number; p_lng: number }
+        Returns: undefined
       }
       write_audit: {
         Args: {

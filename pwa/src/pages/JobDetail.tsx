@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { IconTile } from "@/components/ui/icon-tile";
 import { OverrideModal } from "@/components/OverrideModal";
+import { WeatherCard } from "@/components/WeatherCard";
 import { useSupabaseQuery } from "@/hooks/useSupabaseQuery";
 import {
   abortSortie,
@@ -332,6 +333,9 @@ export default function JobDetail() {
             <div className="text-[11px] text-ink-500 truncate">{j.pesticide_name ?? "no pesticide"}</div>
           </Card>
         </div>
+
+        {/* Weather */}
+        <WeatherCard jobId={j.id} bookingDate={j.scheduled_date} />
 
         {/* Crew */}
         <Card>
