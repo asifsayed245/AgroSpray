@@ -38,11 +38,21 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   signInWithPassword: async (email, password) => {
     set({ loading: true });
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    set({ loading: false });
-    if (error) return { error: error.message };
-    await get().refresh();
-    return { error: null };
+    try {
+      const result = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        new Promise<{ error: { message: string } }>((_, reject) =>
+          setTimeout(() => reject(new Error("Sign-in timed out after 15s. Check your connection and try again.")), 15000),
+        ),
+      ]);
+      set({ loading: false });
+      if ("error" in result && result.error) return { error: result.error.message };
+      await get().refresh();
+      return { error: null };
+    } catch (e) {
+      set({ loading: false });
+      return { error: (e as Error).message ?? "Sign-in failed" };
+    }
   },
 
   signInWithPhone: async (phone) => {
