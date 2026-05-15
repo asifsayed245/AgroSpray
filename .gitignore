@@ -43,6 +43,10 @@ pnpm-debug.log*
 # Vite
 .vite/
 
+# graphify outputs
+graphify-out/
+.graphify/
+
 # Misc
 *.pem
 .cache/

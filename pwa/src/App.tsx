@@ -7,6 +7,8 @@ import DroneFleet from "@/pages/DroneFleet";
 import Jobs from "@/pages/Jobs";
 import JobDetail from "@/pages/JobDetail";
 import NewJob from "@/pages/NewJob";
+import CrewAssign from "@/pages/CrewAssign";
+import Wishlist from "@/pages/Wishlist";
 import Pilots from "@/pages/Pilots";
 import Slots from "@/pages/Slots";
 import AuditLog from "@/pages/AuditLog";
@@ -38,6 +40,8 @@ export default function App() {
         <Route path="/jobs/new" element={<NewJob />} />
         <Route path="/new" element={<NewJob />} />
         <Route path="/jobs/:id" element={<JobDetail />} />
+        <Route path="/jobs/:id/assign" element={<CrewAssign />} />
+        <Route path="/wishlist" element={<Wishlist />} />
         <Route path="/pilots" element={<Pilots />} />
         <Route path="/fleet" element={<DroneFleet />} />
         <Route path="/compliance" element={<Compliance />} />

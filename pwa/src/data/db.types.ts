@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          operationName?: string
-          query?: string
-          variables?: Json
-          extensions?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -1259,12 +1239,38 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      abort_sortie: {
+        Args: { p_reason: string; p_sortie_id: string }
+        Returns: {
+          aborted_reason: string | null
+          area_covered_acres: number | null
+          created_at: string
+          drone_id: string | null
+          gps_centroid_lat: number | null
+          gps_centroid_lng: number | null
+          gps_track: Json | null
+          id: string
+          job_id: string
+          landing_at: string | null
+          npnt_permission_ref: string | null
+          pilot_id: string | null
+          sortie_number: number
+          state: Database["public"]["Enums"]["sortie_state"]
+          takeoff_at: string | null
+          telemetry_blob_url: string | null
+          tenant_id: string
+          updated_at: string
+          volume_sprayed_l: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "sorties"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       assign_crew: {
-        Args: {
-          p_job_id: string
-          p_pilot_id: string
-          p_drone_id: string
-        }
+        Args: { p_drone_id: string; p_job_id: string; p_pilot_id: string }
         Returns: {
           area: number
           area_acres: number
@@ -1294,18 +1300,16 @@ export type Database = {
           version: number
           village: string | null
         }
-      }
-      calculate_pricing: {
-        Args: {
-          p_job_id: string
+        SetofOptions: {
+          from: "*"
+          to: "jobs"
+          isOneToOne: true
+          isSetofReturn: false
         }
-        Returns: Json
       }
+      calculate_pricing: { Args: { p_job_id: string }; Returns: Json }
       cancel_job: {
-        Args: {
-          p_job_id: string
-          p_reason: string
-        }
+        Args: { p_job_id: string; p_reason: string }
         Returns: {
           area: number
           area_acres: number
@@ -1334,12 +1338,72 @@ export type Database = {
           updated_at: string
           version: number
           village: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      cancel_wishlist: {
+        Args: { p_reason: string; p_wishlist_id: string }
+        Returns: {
+          area_acres: number | null
+          confirmed_at: string | null
+          created_at: string
+          crop: string | null
+          farmer_id: string
+          id: string
+          notified_at: string | null
+          preferred_date: string
+          status: Database["public"]["Enums"]["wishlist_status"]
+          tenant_id: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "wishlist_entries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      close_sortie: {
+        Args: {
+          p_area_covered: number
+          p_sortie_id: string
+          p_volume_sprayed: number
+        }
+        Returns: {
+          aborted_reason: string | null
+          area_covered_acres: number | null
+          created_at: string
+          drone_id: string | null
+          gps_centroid_lat: number | null
+          gps_centroid_lng: number | null
+          gps_track: Json | null
+          id: string
+          job_id: string
+          landing_at: string | null
+          npnt_permission_ref: string | null
+          pilot_id: string | null
+          sortie_number: number
+          state: Database["public"]["Enums"]["sortie_state"]
+          takeoff_at: string | null
+          telemetry_blob_url: string | null
+          tenant_id: string
+          updated_at: string
+          volume_sprayed_l: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "sorties"
+          isOneToOne: true
+          isSetofReturn: false
         }
       }
       complete_job: {
-        Args: {
-          p_job_id: string
-        }
+        Args: { p_job_id: string }
         Returns: {
           area: number
           area_acres: number
@@ -1369,21 +1433,58 @@ export type Database = {
           version: number
           village: string | null
         }
+        SetofOptions: {
+          from: "*"
+          to: "jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
-      current_tenant_id: {
-        Args: Record<PropertyKey, never>
-        Returns: string
+      confirm_wishlist: {
+        Args: { p_wishlist_id: string }
+        Returns: {
+          area: number
+          area_acres: number
+          area_unit: Database["public"]["Enums"]["area_unit"]
+          assigned_drone_id: string | null
+          assigned_pilot_id: string | null
+          cancel_reason: string | null
+          created_at: string
+          crop: string
+          farmer_id: string
+          id: string
+          location_lat: number | null
+          location_lng: number | null
+          location_polygon: Json | null
+          number: string
+          override_reason: string | null
+          pesticide_brand: string | null
+          pesticide_name: string | null
+          pricing_snapshot: Json | null
+          reschedule_count: number
+          scheduled_date: string
+          spray_type: string | null
+          state: Database["public"]["Enums"]["job_state"]
+          state_history: Json
+          tenant_id: string
+          updated_at: string
+          version: number
+          village: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
+      current_tenant_id: { Args: never; Returns: string }
       current_user_role: {
-        Args: Record<PropertyKey, never>
+        Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
       ensure_slot: {
-        Args: {
-          p_tenant_id: string
-          p_date: string
-          p_capacity: number
-        }
+        Args: { p_capacity: number; p_date: string; p_tenant_id: string }
         Returns: {
           booked: number
           capacity: number
@@ -1397,22 +1498,72 @@ export type Database = {
           updated_at: string
           version: number
         }
-      }
-      generate_job_number: {
-        Args: {
-          p_tenant_id: string
-          p_crop: string
-          p_date: string
+        SetofOptions: {
+          from: "*"
+          to: "slots"
+          isOneToOne: true
+          isSetofReturn: false
         }
+      }
+      generate_invoice: {
+        Args: { p_job_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          job_id: string
+          line_items: Json
+          number: string
+          paid_at: string | null
+          paid_by_method: string | null
+          paid_reference: string | null
+          subtotal: number
+          tax_total: number
+          tenant_id: string
+          total: number
+          updated_at: string
+          upi_qr_payload: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "invoices"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      generate_invoice_number: {
+        Args: { p_tenant_id: string }
         Returns: string
       }
-      has_admin_role: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
+      generate_job_number: {
+        Args: { p_crop: string; p_date: string; p_tenant_id: string }
+        Returns: string
       }
-      has_override_role: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
+      has_admin_role: { Args: never; Returns: boolean }
+      has_override_role: { Args: never; Returns: boolean }
+      mark_invoice_paid: {
+        Args: { p_invoice_id: string; p_method: string; p_reference: string }
+        Returns: {
+          created_at: string
+          id: string
+          job_id: string
+          line_items: Json
+          number: string
+          paid_at: string | null
+          paid_by_method: string | null
+          paid_reference: string | null
+          subtotal: number
+          tax_total: number
+          tenant_id: string
+          total: number
+          updated_at: string
+          upi_qr_payload: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "invoices"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       override_state: {
         Args: {
@@ -1449,37 +1600,20 @@ export type Database = {
           version: number
           village: string | null
         }
-      }
-      reconcile_job: {
-        Args: {
-          p_job_id: string
+        SetofOptions: {
+          from: "*"
+          to: "jobs"
+          isOneToOne: true
+          isSetofReturn: false
         }
-        Returns: boolean
       }
+      reconcile_job: { Args: { p_job_id: string }; Returns: boolean }
       release_slot: {
-        Args: {
-          p_tenant_id: string
-          p_date: string
-        }
+        Args: { p_date: string; p_tenant_id: string }
         Returns: undefined
       }
-      reserve_slot: {
-        Args: {
-          p_tenant_id: string
-          p_date: string
-        }
-        Returns: boolean
-      }
-      run_compliance_checks: {
-        Args: {
-          p_job_id: string
-        }
-        Returns: boolean
-      }
-      submit_job_for_compliance: {
-        Args: {
-          p_job_id: string
-        }
+      reschedule_job: {
+        Args: { p_job_id: string; p_new_date: string; p_reason: string }
         Returns: {
           area: number
           area_acres: number
@@ -1509,17 +1643,96 @@ export type Database = {
           version: number
           village: string | null
         }
+        SetofOptions: {
+          from: "*"
+          to: "jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      reserve_slot: {
+        Args: { p_date: string; p_tenant_id: string }
+        Returns: boolean
+      }
+      run_compliance_checks: { Args: { p_job_id: string }; Returns: boolean }
+      start_sortie: {
+        Args: { p_job_id: string }
+        Returns: {
+          aborted_reason: string | null
+          area_covered_acres: number | null
+          created_at: string
+          drone_id: string | null
+          gps_centroid_lat: number | null
+          gps_centroid_lng: number | null
+          gps_track: Json | null
+          id: string
+          job_id: string
+          landing_at: string | null
+          npnt_permission_ref: string | null
+          pilot_id: string | null
+          sortie_number: number
+          state: Database["public"]["Enums"]["sortie_state"]
+          takeoff_at: string | null
+          telemetry_blob_url: string | null
+          tenant_id: string
+          updated_at: string
+          volume_sprayed_l: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "sorties"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      submit_job_for_compliance: {
+        Args: { p_job_id: string }
+        Returns: {
+          area: number
+          area_acres: number
+          area_unit: Database["public"]["Enums"]["area_unit"]
+          assigned_drone_id: string | null
+          assigned_pilot_id: string | null
+          cancel_reason: string | null
+          created_at: string
+          crop: string
+          farmer_id: string
+          id: string
+          location_lat: number | null
+          location_lng: number | null
+          location_polygon: Json | null
+          number: string
+          override_reason: string | null
+          pesticide_brand: string | null
+          pesticide_name: string | null
+          pricing_snapshot: Json | null
+          reschedule_count: number
+          scheduled_date: string
+          spray_type: string | null
+          state: Database["public"]["Enums"]["job_state"]
+          state_history: Json
+          tenant_id: string
+          updated_at: string
+          version: number
+          village: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       write_audit: {
         Args: {
-          p_tenant_id: string
           p_actor_id: string
           p_actor_type: string
-          p_source: Database["public"]["Enums"]["audit_source"]
-          p_entity_type: string
           p_entity_id: string
+          p_entity_type: string
           p_event_type: string
           p_payload: Json
+          p_source: Database["public"]["Enums"]["audit_source"]
+          p_tenant_id: string
         }
         Returns: string
       }
@@ -1579,27 +1792,33 @@ export type Database = {
   }
 }
 
-type PublicSchema = Database[Extract<keyof Database, "public">]
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
-  PublicTableNameOrOptions extends
-    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-        Database[PublicTableNameOrOptions["schema"]]["Views"])
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
-      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
-        PublicSchema["Views"])
-    ? (PublicSchema["Tables"] &
-        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -1607,20 +1826,24 @@ export type Tables<
     : never
 
 export type TablesInsert<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -1628,20 +1851,24 @@ export type TablesInsert<
     : never
 
 export type TablesUpdate<
-  PublicTableNameOrOptions extends
-    | keyof PublicSchema["Tables"]
-    | { schema: keyof Database },
-  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = PublicTableNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
-    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -1649,30 +1876,94 @@ export type TablesUpdate<
     : never
 
 export type Enums<
-  PublicEnumNameOrOptions extends
-    | keyof PublicSchema["Enums"]
-    | { schema: keyof Database },
-  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
-    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = PublicEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
-    ? PublicSchema["Enums"][PublicEnumNameOrOptions]
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof PublicSchema["CompositeTypes"]
-    | { schema: keyof Database },
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
-    ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
+export const Constants = {
+  public: {
+    Enums: {
+      area_unit: ["acre", "hectare", "bigha", "guntha", "kanal", "ghumao"],
+      audit_source: ["auto", "manual", "override"],
+      compliance_check_type: [
+        "dgca_uin",
+        "dgca_rpc",
+        "cib_pesticide",
+        "npnt",
+        "pricing",
+      ],
+      compliance_status: ["pass", "fail", "overridden"],
+      drone_status: ["ready", "in_flight", "maintenance", "out_of_service"],
+      incident_severity: ["low", "medium", "high", "critical"],
+      incident_type: [
+        "crash",
+        "drift",
+        "injury",
+        "equipment_failure",
+        "near_miss",
+      ],
+      job_state: [
+        "draft",
+        "compliance",
+        "confirmed",
+        "crew_assigned",
+        "in_progress",
+        "complete",
+        "invoiced",
+        "paid",
+        "wishlist",
+        "comp_fail",
+        "cancelled",
+        "failed",
+        "disputed",
+      ],
+      sortie_state: ["pending", "pre_flight", "active", "closed", "aborted"],
+      user_role: [
+        "owner",
+        "admin",
+        "operations",
+        "accountant",
+        "support",
+        "viewer",
+        "pilot",
+        "farmer",
+      ],
+      wishlist_status: [
+        "waiting",
+        "notified",
+        "confirmed",
+        "expired",
+        "cancelled",
+      ],
+    },
+  },
+} as const

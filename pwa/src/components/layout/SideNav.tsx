@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 import {
   Home,
   ClipboardList,
+  Heart,
   ShieldCheck,
   Plane,
   Users,
@@ -13,6 +14,7 @@ import { cn } from "@/lib/utils";
 const links = [
   { to: "/", label: "Dashboard", icon: Home },
   { to: "/jobs", label: "Jobs", icon: ClipboardList },
+  { to: "/wishlist", label: "Wishlist", icon: Heart },
   { to: "/compliance", label: "Compliance", icon: ShieldCheck },
   { to: "/fleet", label: "Drone fleet", icon: Plane },
   { to: "/pilots", label: "Pilots", icon: Users },

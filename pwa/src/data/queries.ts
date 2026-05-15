@@ -201,3 +201,96 @@ export async function ensureSlot(date: string, capacity: number) {
     { onConflict: "tenant_id,date" },
   );
 }
+
+// ---------- Chunk A: sortie controls, invoice, reschedule, wishlist ----------
+
+export async function startSortie(jobId: string) {
+  return supabase.rpc("start_sortie", { p_job_id: jobId });
+}
+export async function closeSortie(
+  sortieId: string,
+  areaCovered: number,
+  volumeSprayed: number,
+) {
+  return supabase.rpc("close_sortie", {
+    p_sortie_id: sortieId,
+    p_area_covered: areaCovered,
+    p_volume_sprayed: volumeSprayed,
+  });
+}
+export async function abortSortie(sortieId: string, reason: string) {
+  return supabase.rpc("abort_sortie", { p_sortie_id: sortieId, p_reason: reason });
+}
+
+export async function rescheduleJob(jobId: string, newDate: string, reason: string) {
+  return supabase.rpc("reschedule_job", {
+    p_job_id: jobId,
+    p_new_date: newDate,
+    p_reason: reason,
+  });
+}
+
+export async function generateInvoice(jobId: string) {
+  return supabase.rpc("generate_invoice", { p_job_id: jobId });
+}
+export async function markInvoicePaid(invoiceId: string, method: string, reference: string) {
+  return supabase.rpc("mark_invoice_paid", {
+    p_invoice_id: invoiceId,
+    p_method: method,
+    p_reference: reference,
+  });
+}
+
+export type InvoiceRow = {
+  id: string;
+  job_id: string;
+  number: string;
+  line_items: unknown;
+  subtotal: number;
+  tax_total: number;
+  total: number;
+  upi_qr_payload: string | null;
+  paid_at: string | null;
+  paid_by_method: string | null;
+  paid_reference: string | null;
+  created_at: string;
+};
+
+export async function getInvoiceForJob(jobId: string) {
+  return supabase
+    .from("invoices")
+    .select("id, job_id, number, line_items, subtotal, tax_total, total, upi_qr_payload, paid_at, paid_by_method, paid_reference, created_at")
+    .eq("job_id", jobId)
+    .maybeSingle()
+    .returns<InvoiceRow | null>();
+}
+
+export type WishlistRow = {
+  id: string;
+  farmer_id: string;
+  preferred_date: string;
+  crop: string | null;
+  area_acres: number | null;
+  status: Database["public"]["Enums"]["wishlist_status"];
+  notified_at: string | null;
+  confirmed_at: string | null;
+  created_at: string;
+  farmer: { id: string; name: string; phone: string | null; village: string | null } | null;
+};
+
+export async function listWishlist() {
+  return supabase
+    .from("wishlist_entries")
+    .select(
+      "id, farmer_id, preferred_date, crop, area_acres, status, notified_at, confirmed_at, created_at, farmer:farmers!farmer_id(id, name, phone, village)",
+    )
+    .order("preferred_date", { ascending: true })
+    .returns<WishlistRow[]>();
+}
+
+export async function confirmWishlist(wishlistId: string) {
+  return supabase.rpc("confirm_wishlist", { p_wishlist_id: wishlistId });
+}
+export async function cancelWishlist(wishlistId: string, reason: string) {
+  return supabase.rpc("cancel_wishlist", { p_wishlist_id: wishlistId, p_reason: reason });
+}
