@@ -29,7 +29,22 @@ interface AuthState {
   refresh: () => Promise<void>;
 }
 
-export const useAuth = create<AuthState>((set, get) => ({
+// Fetch the user's profile row in the background — never blocks UI hydration
+// or sign-in completion. If it fails, the app still works (profile is optional).
+function loadProfileInBackground(userId: string) {
+  supabase
+    .from("profiles")
+    .select("id, tenant_id, role, full_name, phone, email")
+    .eq("id", userId)
+    .maybeSingle()
+    .then(({ data }) => {
+      useAuth.setState({ profile: (data as Profile | null) ?? null });
+    }, () => {
+      // swallow — profile is non-critical for navigation
+    });
+}
+
+export const useAuth = create<AuthState>((set) => ({
   session: null,
   user: null,
   profile: null,
@@ -41,13 +56,26 @@ export const useAuth = create<AuthState>((set, get) => ({
     try {
       const result = await Promise.race([
         supabase.auth.signInWithPassword({ email, password }),
-        new Promise<{ error: { message: string } }>((_, reject) =>
-          setTimeout(() => reject(new Error("Sign-in timed out after 15s. Check your connection and try again.")), 15000),
+        new Promise<{ data: null; error: { message: string } }>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  "Sign-in timed out after 15s. Check your connection and try again.",
+                ),
+              ),
+            15000,
+          ),
         ),
       ]);
       set({ loading: false });
-      if ("error" in result && result.error) return { error: result.error.message };
-      await get().refresh();
+      if (result.error) return { error: result.error.message };
+      // Use session directly from the response — avoids calling getSession() again
+      // which would serialize behind any in-flight auth operations.
+      const session = result.data?.session ?? null;
+      const user = result.data?.user ?? null;
+      set({ session, user, hydrated: true });
+      if (user) loadProfileInBackground(user.id);
       return { error: null };
     } catch (e) {
       set({ loading: false });
@@ -64,23 +92,29 @@ export const useAuth = create<AuthState>((set, get) => ({
 
   verifyPhoneOtp: async (phone, token) => {
     set({ loading: true });
-    const { error } = await supabase.auth.verifyOtp({ phone, token, type: "sms" });
+    const { data, error } = await supabase.auth.verifyOtp({ phone, token, type: "sms" });
     set({ loading: false });
     if (error) return { error: error.message };
-    await get().refresh();
+    const session = data?.session ?? null;
+    const user = data?.user ?? null;
+    set({ session, user, hydrated: true });
+    if (user) loadProfileInBackground(user.id);
     return { error: null };
   },
 
   signUpWithPassword: async (email, password, fullName) => {
     set({ loading: true });
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { full_name: fullName ?? "" } },
     });
     set({ loading: false });
     if (error) return { error: error.message };
-    await get().refresh();
+    const session = data?.session ?? null;
+    const user = data?.user ?? null;
+    set({ session, user, hydrated: true });
+    if (user) loadProfileInBackground(user.id);
     return { error: null };
   },
 
@@ -94,16 +128,8 @@ export const useAuth = create<AuthState>((set, get) => ({
       const { data } = await supabase.auth.getSession();
       const session = data.session ?? null;
       const user = session?.user ?? null;
-      let profile: Profile | null = null;
-      if (user) {
-        const { data: p } = await supabase
-          .from("profiles")
-          .select("id, tenant_id, role, full_name, phone, email")
-          .eq("id", user.id)
-          .maybeSingle();
-        profile = (p as Profile | null) ?? null;
-      }
-      set({ session, user, profile, hydrated: true });
+      set({ session, user, hydrated: true });
+      if (user) loadProfileInBackground(user.id);
     } catch (e) {
       console.warn("[auth] refresh failed:", e);
       set({ session: null, user: null, profile: null, hydrated: true });
@@ -112,22 +138,31 @@ export const useAuth = create<AuthState>((set, get) => ({
 }));
 
 // Wire global listener — called once at app boot.
+// Important: we rely entirely on the listener (which fires `INITIAL_SESSION`
+// synchronously after subscribe with the cached session from localStorage).
+// We deliberately do NOT call `getSession()` proactively, because that takes
+// the supabase-js internal auth lock and can cause a later `signInWithPassword`
+// to serialize behind it and hang for the user. See:
+// https://github.com/supabase/supabase-js/issues/676
 export function initAuthSubscription() {
-  supabase.auth.onAuthStateChange(async (_event, session) => {
-    useAuth.setState({ session, user: session?.user ?? null });
-    if (session?.user) await useAuth.getState().refresh();
-    else useAuth.setState({ profile: null, hydrated: true });
+  supabase.auth.onAuthStateChange((_event, session) => {
+    const user = session?.user ?? null;
+    useAuth.setState({ session, user, hydrated: true });
+    if (user) loadProfileInBackground(user.id);
+    else useAuth.setState({ profile: null });
   });
-  // Safety: if refresh hangs for any reason (network, stuck CDN, blocked SDK),
-  // unblock the UI after 6s so the user lands on /login and can still sign in.
-  const watchdog = setTimeout(() => {
+
+  // Belt-and-braces watchdog: if the listener somehow never fires `INITIAL_SESSION`
+  // (e.g. SDK in a broken state), unblock the UI after 4s so the user can reach login.
+  setTimeout(() => {
     if (!useAuth.getState().hydrated) {
-      console.warn("[auth] hydration watchdog fired after 6s — forcing logged-out state");
-      useAuth.setState({ hydrated: true, session: null, user: null, profile: null });
+      console.warn("[auth] watchdog: forcing logged-out state");
+      useAuth.setState({
+        hydrated: true,
+        session: null,
+        user: null,
+        profile: null,
+      });
     }
-  }, 6000);
-  void useAuth
-    .getState()
-    .refresh()
-    .finally(() => clearTimeout(watchdog));
+  }, 4000);
 }
