@@ -60,6 +60,8 @@ type Strings = {
   notNumber: string;
   notValidName: string;
   notValidPhone: string;
+  queryReceived: string;
+  queryReceivedIdle: string;
   acceptBtn: string;
   confirmBtn: string;
   cancelBtn: string;
@@ -111,6 +113,8 @@ const STRINGS: Record<Lang, Strings> = {
     notNumber: "Please send a number — e.g. `12` for 12 acres.",
     notValidName: "Please send your full name (at least 2 letters).",
     notValidPhone: "Please send a valid 10-digit Indian mobile number — e.g. `9876543210`.",
+    queryReceived: "Got it 👍 — we've sent your question to the team. Meanwhile, let's continue:",
+    queryReceivedIdle: "Got it 👍 — we've sent your question to the team. They'll reply here soon.\n\nSend /start to book a new spray any time.",
     acceptBtn: "✅ Accept",
     confirmBtn: "✅ Confirm",
     cancelBtn: "❌ Cancel",
@@ -160,6 +164,8 @@ const STRINGS: Record<Lang, Strings> = {
     notNumber: "कृपया एक संख्या भेजें — जैसे 12 एकड़ के लिए `12`।",
     notValidName: "कृपया अपना पूरा नाम भेजें (कम से कम 2 अक्षर)।",
     notValidPhone: "कृपया सही 10-अंकीय भारतीय मोबाइल नंबर भेजें — जैसे `9876543210`।",
+    queryReceived: "मिल गया 👍 — हमने आपका सवाल टीम को भेज दिया है। तब तक हम आगे बढ़ते हैं:",
+    queryReceivedIdle: "मिल गया 👍 — हमने आपका सवाल टीम को भेज दिया है। टीम जल्द ही जवाब देगी।\n\nनई स्प्रे बुक करने के लिए /start भेजें।",
     acceptBtn: "✅ स्वीकार करें",
     confirmBtn: "✅ पुष्टि करें",
     cancelBtn: "❌ रद्द करें",
@@ -209,6 +215,8 @@ const STRINGS: Record<Lang, Strings> = {
     notNumber: "कृपया संख्या पाठवा — जसे 12 एकरसाठी `12`.",
     notValidName: "कृपया तुमचं पूर्ण नाव पाठवा (किमान 2 अक्षरे).",
     notValidPhone: "कृपया योग्य 10-अंकी भारतीय मोबाइल नंबर पाठवा — जसे `9876543210`.",
+    queryReceived: "मिळालं 👍 — आम्ही तुमचा प्रश्न टीमकडे पाठवला आहे. तोपर्यंत पुढे चालू ठेवू:",
+    queryReceivedIdle: "मिळालं 👍 — आम्ही तुमचा प्रश्न टीमकडे पाठवला आहे. टीम लवकरच उत्तर देईल.\n\nनवीन फवारणी बुक करण्यासाठी /start पाठवा.",
     acceptBtn: "✅ मान्य",
     confirmBtn: "✅ पुष्टी",
     cancelBtn: "❌ रद्द",
@@ -421,6 +429,53 @@ async function reply(token: string, tenantId: string, chatId: string, text: stri
 }
 
 // ────────────────────────────────────────────────────────────────
+// Capture a free-form query and notify ops on Telegram.
+// Used whenever the farmer sends text the state machine can't interpret.
+// ────────────────────────────────────────────────────────────────
+async function captureQuery(
+  token: string,
+  tenantId: string,
+  chatId: string,
+  userId: string | null,
+  username: string | null,
+  lang: Lang,
+  text: string,
+  state: string,
+) {
+  const { data, error } = await supa.rpc("tg_capture_query", {
+    p_tenant_id: tenantId,
+    p_telegram_chat_id: chatId,
+    p_telegram_user_id: userId,
+    p_username: username,
+    p_language: lang,
+    p_text: text,
+    p_state: state,
+  });
+  if (error) {
+    console.error("tg_capture_query failed", error);
+    return;
+  }
+  const r = data as { id?: string; farmer_name?: string; phone?: string | null; ops_chat_id?: string | null };
+  if (r?.ops_chat_id) {
+    const langLabel = LANG_LABEL[lang] ?? lang;
+    const opsBody =
+      `📨 *New farmer query*\n` +
+      `From: ${r.farmer_name ?? "Telegram user"}` +
+      (r.phone ? ` · ${r.phone}` : "") +
+      ` · ${langLabel}\n` +
+      `In: \`${state}\`\n\n` +
+      `> ${text.slice(0, 700)}\n\n` +
+      `Reply at: https://agrospray.pages.dev/queries`;
+    await tg("sendMessage", token, {
+      chat_id: r.ops_chat_id,
+      text: opsBody,
+      parse_mode: "Markdown",
+      disable_web_page_preview: true,
+    });
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
 // State machine
 // ────────────────────────────────────────────────────────────────
 async function handleInput(
@@ -508,6 +563,10 @@ async function handleInput(
         if (LANGS.includes(v as Lang)) picked = v as Lang;
       }
       if (!picked) {
+        if (text && !callbackData) {
+          await captureQuery(token, tenantId, chatId, userId, username, lang, text, "awaiting_language");
+          await reply(token, tenantId, chatId, STRINGS.en.queryReceived);
+        }
         return reply(token, tenantId, chatId, STRINGS.en.askLanguage, { reply_markup: langButtons() });
       }
       await setSession(session.id, { state: "awaiting_consent", language: picked });
@@ -523,6 +582,10 @@ async function handleInput(
         });
         await reply(token, tenantId, chatId, s.consentAccepted);
         return reply(token, tenantId, chatId, s.askName);
+      }
+      if (text && !callbackData) {
+        await captureQuery(token, tenantId, chatId, userId, username, lang, text, "awaiting_consent");
+        await reply(token, tenantId, chatId, s.queryReceived);
       }
       return reply(token, tenantId, chatId, s.consent, { reply_markup: consentButtons(lang) });
     }
@@ -553,6 +616,10 @@ async function handleInput(
       if (callbackData?.startsWith("crop:")) crop = callbackData.slice(5);
       else if (CROP_IDS.has(lower)) crop = lower;
       if (!crop) {
+        if (text && !callbackData) {
+          await captureQuery(token, tenantId, chatId, userId, username, lang, text, "awaiting_crop");
+          await reply(token, tenantId, chatId, s.queryReceived);
+        }
         return reply(token, tenantId, chatId, s.askCrop, { reply_markup: cropButtons(lang) });
       }
       await setSession(session.id, {
@@ -577,6 +644,10 @@ async function handleInput(
       if (callbackData?.startsWith("date:")) iso = callbackData.slice(5);
       else if (/^\d{4}-\d{2}-\d{2}$/.test(input)) iso = input;
       if (!iso) {
+        if (text && !callbackData) {
+          await captureQuery(token, tenantId, chatId, userId, username, lang, text, "awaiting_date");
+          await reply(token, tenantId, chatId, s.queryReceived);
+        }
         return reply(token, tenantId, chatId, s.askDate, { reply_markup: dateButtons(lang) });
       }
       await setSession(session.id, {
@@ -600,6 +671,10 @@ async function handleInput(
       if (callbackData?.startsWith("spray:")) spray = callbackData.slice(6);
       else if (SPRAY_IDS.has(lower)) spray = lower;
       if (!spray) {
+        if (text && !callbackData) {
+          await captureQuery(token, tenantId, chatId, userId, username, lang, text, "awaiting_spray_type");
+          await reply(token, tenantId, chatId, s.queryReceived);
+        }
         return reply(token, tenantId, chatId, s.askSprayType, { reply_markup: sprayButtons(lang) });
       }
       const nextDraft = { ...draft, spray_type: spray };
@@ -636,6 +711,10 @@ async function handleInput(
         }
         return reply(token, tenantId, chatId, s.compFail(r.job_number ?? "AGR-?"));
       }
+      if (text && !callbackData) {
+        await captureQuery(token, tenantId, chatId, userId, username, lang, text, "awaiting_confirm");
+        await reply(token, tenantId, chatId, s.queryReceived);
+      }
       const displayDraft: Draft = {
         ...draft,
         crop: localizedLabel("crop", draft.crop, lang),
@@ -645,10 +724,16 @@ async function handleInput(
         reply_markup: confirmButtons(lang),
       });
     }
-    default:
-      // idle / unknown → restart from language
+    default: {
+      // idle or unknown — if the farmer typed free-form text, file it as a
+      // query. They don't have a flow to resume so just acknowledge.
+      if (text && !callbackData) {
+        await captureQuery(token, tenantId, chatId, userId, username, lang, text, session.state ?? "idle");
+        return reply(token, tenantId, chatId, s.queryReceivedIdle);
+      }
       await setSession(session.id, { state: "awaiting_language", draft: {} });
       return reply(token, tenantId, chatId, STRINGS.en.askLanguage, { reply_markup: langButtons() });
+    }
   }
 }
 

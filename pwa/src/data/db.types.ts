@@ -307,6 +307,168 @@ export type Database = {
           },
         ]
       }
+      farmer_queries: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          context_state: string | null
+          farmer_id: string | null
+          id: string
+          inbound_text: string
+          language: string
+          opened_at: string
+          related_job_id: string | null
+          replied_at: string | null
+          replied_by: string | null
+          reply_text: string | null
+          sla_due_at: string
+          source: string
+          status: string
+          telegram_chat_id: string
+          telegram_user_id: string | null
+          tenant_id: string
+          username: string | null
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          context_state?: string | null
+          farmer_id?: string | null
+          id?: string
+          inbound_text: string
+          language?: string
+          opened_at?: string
+          related_job_id?: string | null
+          replied_at?: string | null
+          replied_by?: string | null
+          reply_text?: string | null
+          sla_due_at?: string
+          source?: string
+          status?: string
+          telegram_chat_id: string
+          telegram_user_id?: string | null
+          tenant_id: string
+          username?: string | null
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          context_state?: string | null
+          farmer_id?: string | null
+          id?: string
+          inbound_text?: string
+          language?: string
+          opened_at?: string
+          related_job_id?: string | null
+          replied_at?: string | null
+          replied_by?: string | null
+          reply_text?: string | null
+          sla_due_at?: string
+          source?: string
+          status?: string
+          telegram_chat_id?: string
+          telegram_user_id?: string | null
+          tenant_id?: string
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "farmer_queries_closed_by_fkey"
+            columns: ["closed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "farmer_queries_farmer_id_fkey"
+            columns: ["farmer_id"]
+            isOneToOne: false
+            referencedRelation: "farmers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "farmer_queries_related_job_id_fkey"
+            columns: ["related_job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "farmer_queries_replied_by_fkey"
+            columns: ["replied_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "farmer_queries_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      farmer_sessions: {
+        Row: {
+          consent_at: string | null
+          created_at: string
+          draft: Json
+          farmer_id: string | null
+          id: string
+          language: string
+          last_activity_at: string
+          state: string
+          telegram_chat_id: string
+          telegram_user_id: string | null
+          tenant_id: string
+          username: string | null
+        }
+        Insert: {
+          consent_at?: string | null
+          created_at?: string
+          draft?: Json
+          farmer_id?: string | null
+          id?: string
+          language?: string
+          last_activity_at?: string
+          state?: string
+          telegram_chat_id: string
+          telegram_user_id?: string | null
+          tenant_id: string
+          username?: string | null
+        }
+        Update: {
+          consent_at?: string | null
+          created_at?: string
+          draft?: Json
+          farmer_id?: string | null
+          id?: string
+          language?: string
+          last_activity_at?: string
+          state?: string
+          telegram_chat_id?: string
+          telegram_user_id?: string | null
+          tenant_id?: string
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "farmer_sessions_farmer_id_fkey"
+            columns: ["farmer_id"]
+            isOneToOne: false
+            referencedRelation: "farmers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "farmer_sessions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       farmers: {
         Row: {
           booking_count: number
@@ -1102,6 +1264,59 @@ export type Database = {
           },
         ]
       }
+      telegram_messages: {
+        Row: {
+          body: string | null
+          chat_id: string
+          created_at: string
+          direction: string
+          error: string | null
+          id: string
+          message_id: string | null
+          payload: Json
+          state: string | null
+          tenant_id: string
+          user_id: string | null
+          username: string | null
+        }
+        Insert: {
+          body?: string | null
+          chat_id: string
+          created_at?: string
+          direction: string
+          error?: string | null
+          id?: string
+          message_id?: string | null
+          payload?: Json
+          state?: string | null
+          tenant_id: string
+          user_id?: string | null
+          username?: string | null
+        }
+        Update: {
+          body?: string | null
+          chat_id?: string
+          created_at?: string
+          direction?: string
+          error?: string | null
+          id?: string
+          message_id?: string | null
+          payload?: Json
+          state?: string | null
+          tenant_id?: string
+          user_id?: string | null
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "telegram_messages_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenants: {
         Row: {
           activated_at: string | null
@@ -1368,6 +1583,36 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      close_farmer_query: {
+        Args: { p_query_id: string }
+        Returns: {
+          closed_at: string | null
+          closed_by: string | null
+          context_state: string | null
+          farmer_id: string | null
+          id: string
+          inbound_text: string
+          language: string
+          opened_at: string
+          related_job_id: string | null
+          replied_at: string | null
+          replied_by: string | null
+          reply_text: string | null
+          sla_due_at: string
+          source: string
+          status: string
+          telegram_chat_id: string
+          telegram_user_id: string | null
+          tenant_id: string
+          username: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "farmer_queries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       close_sortie: {
         Args: {
           p_area_covered: number
@@ -1540,6 +1785,36 @@ export type Database = {
       }
       has_admin_role: { Args: never; Returns: boolean }
       has_override_role: { Args: never; Returns: boolean }
+      mark_farmer_query_delivered: {
+        Args: { p_query_id: string }
+        Returns: {
+          closed_at: string | null
+          closed_by: string | null
+          context_state: string | null
+          farmer_id: string | null
+          id: string
+          inbound_text: string
+          language: string
+          opened_at: string
+          related_job_id: string | null
+          replied_at: string | null
+          replied_by: string | null
+          reply_text: string | null
+          sla_due_at: string
+          source: string
+          status: string
+          telegram_chat_id: string
+          telegram_user_id: string | null
+          tenant_id: string
+          username: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "farmer_queries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       mark_invoice_paid: {
         Args: { p_invoice_id: string; p_method: string; p_reference: string }
         Returns: {
@@ -1611,6 +1886,36 @@ export type Database = {
       release_slot: {
         Args: { p_date: string; p_tenant_id: string }
         Returns: undefined
+      }
+      reply_to_farmer_query: {
+        Args: { p_query_id: string; p_reply: string }
+        Returns: {
+          closed_at: string | null
+          closed_by: string | null
+          context_state: string | null
+          farmer_id: string | null
+          id: string
+          inbound_text: string
+          language: string
+          opened_at: string
+          related_job_id: string | null
+          replied_at: string | null
+          replied_by: string | null
+          reply_text: string | null
+          sla_due_at: string
+          source: string
+          status: string
+          telegram_chat_id: string
+          telegram_user_id: string | null
+          tenant_id: string
+          username: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "farmer_queries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       reschedule_job: {
         Args: { p_job_id: string; p_new_date: string; p_reason: string }
@@ -1722,6 +2027,22 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      tg_capture_query: {
+        Args: {
+          p_language: string
+          p_state: string
+          p_telegram_chat_id: string
+          p_telegram_user_id: string
+          p_tenant_id: string
+          p_text: string
+          p_username: string
+        }
+        Returns: Json
+      }
+      tg_finalize_booking: {
+        Args: { p_telegram_chat_id: string; p_tenant_id: string }
+        Returns: Json
       }
       write_audit: {
         Args: {

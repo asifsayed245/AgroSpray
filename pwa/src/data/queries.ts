@@ -294,3 +294,60 @@ export async function confirmWishlist(wishlistId: string) {
 export async function cancelWishlist(wishlistId: string, reason: string) {
   return supabase.rpc("cancel_wishlist", { p_wishlist_id: wishlistId, p_reason: reason });
 }
+
+// ---------- Chunk D: farmer queries inbox ----------
+
+export type FarmerQueryRow = {
+  id: string;
+  status: string;
+  inbound_text: string;
+  language: string;
+  opened_at: string;
+  sla_due_at: string;
+  reply_text: string | null;
+  replied_at: string | null;
+  closed_at: string | null;
+  telegram_chat_id: string;
+  context_state: string | null;
+  username: string | null;
+  farmer: { id: string; name: string; phone: string | null; village: string | null } | null;
+};
+
+export async function listFarmerQueries(status?: string | string[]) {
+  let q = supabase
+    .from("farmer_queries")
+    .select(
+      "id, status, inbound_text, language, opened_at, sla_due_at, reply_text, replied_at, closed_at, telegram_chat_id, context_state, username, farmer:farmers!farmer_id(id, name, phone, village)",
+    )
+    .order("opened_at", { ascending: false })
+    .limit(100);
+  if (status) {
+    if (Array.isArray(status)) q = q.in("status", status);
+    else q = q.eq("status", status);
+  }
+  return q.returns<FarmerQueryRow[]>();
+}
+
+export async function openQueriesCount() {
+  return supabase
+    .from("farmer_queries")
+    .select("id", { count: "exact", head: true })
+    .in("status", ["open", "replying"]);
+}
+
+export async function replyToQuery(queryId: string, reply: string) {
+  const r = await supabase.rpc("reply_to_farmer_query", { p_query_id: queryId, p_reply: reply });
+  if (r.error) return { error: r.error };
+  // Trigger Telegram delivery — separate edge function so RLS stays simple.
+  const send = await supabase.functions.invoke("telegram-send-reply", {
+    body: { query_id: queryId },
+  });
+  if (send.error) {
+    return { error: { message: `Saved reply, but Telegram send failed: ${send.error.message}` } };
+  }
+  return { error: null };
+}
+
+export async function closeQuery(queryId: string) {
+  return supabase.rpc("close_farmer_query", { p_query_id: queryId });
+}

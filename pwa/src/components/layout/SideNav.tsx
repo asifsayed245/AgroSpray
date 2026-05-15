@@ -3,6 +3,7 @@ import {
   Home,
   ClipboardList,
   Heart,
+  MessageSquare,
   ShieldCheck,
   Plane,
   Users,
@@ -14,6 +15,7 @@ import { cn } from "@/lib/utils";
 const links = [
   { to: "/", label: "Dashboard", icon: Home },
   { to: "/jobs", label: "Jobs", icon: ClipboardList },
+  { to: "/queries", label: "Queries", icon: MessageSquare },
   { to: "/wishlist", label: "Wishlist", icon: Heart },
   { to: "/compliance", label: "Compliance", icon: ShieldCheck },
   { to: "/fleet", label: "Drone fleet", icon: Plane },
