@@ -1,30 +1,78 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Wheat, ChevronRight, Plus, Filter, CheckCircle2, AlertTriangle, XCircle } from "lucide-react";
+import { Wheat, ChevronRight, Plus, Filter, Wind } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { IconTile } from "@/components/ui/icon-tile";
 import { Button } from "@/components/ui/button";
 import { useSupabaseQuery } from "@/hooks/useSupabaseQuery";
-import { listJobs } from "@/data/queries";
-import type { JobRow } from "@/data/queries";
+import { listJobs, listLatestWeatherForJobs } from "@/data/queries";
+import type { JobRow, WeatherDay, WeatherSafety } from "@/data/queries";
 
 const TERMINAL_STATES = new Set(["complete", "invoiced", "paid", "cancelled", "failed"]);
 
-function WeatherPill({ safety }: { safety?: "good" | "marginal" | "unsafe" | null }) {
-  if (!safety) return null;
-  const map = {
-    good:     { Icon: CheckCircle2,  cls: "bg-mint-50 text-mint-700 border-mint-200",   label: "Spray-safe" },
-    marginal: { Icon: AlertTriangle, cls: "bg-amber-50 text-amber-700 border-amber-200", label: "Marginal" },
-    unsafe:   { Icon: XCircle,       cls: "bg-red-50 text-red-700 border-red-200",       label: "Unsafe" },
-  } as const;
-  const { Icon, cls, label } = map[safety];
+// Tailwind classes per safety — kept centralised so card + day cells stay in sync.
+const SAFETY_CELL: Record<WeatherSafety, string> = {
+  good:     "bg-mint-100 text-mint-800 border-mint-300",
+  marginal: "bg-amber-100 text-amber-800 border-amber-300",
+  unsafe:   "bg-red-100 text-red-800 border-red-300",
+};
+const SAFETY_DOT: Record<WeatherSafety, string> = {
+  good:     "bg-mint-500",
+  marginal: "bg-amber-500",
+  unsafe:   "bg-red-500",
+};
+const SAFETY_DATE_TEXT: Record<WeatherSafety, string> = {
+  good:     "text-mint-700",
+  marginal: "text-amber-700",
+  unsafe:   "text-red-700",
+};
+
+function weekdayShort(iso: string) {
+  return new Date(iso).toLocaleDateString("en-IN", { weekday: "short" });
+}
+function dayNum(iso: string) {
+  return String(new Date(iso).getDate()).padStart(2, "0");
+}
+
+// 5-day mini strip: D-1 → D+3, booking date emphasised with a thicker ring.
+function WeatherStrip({
+  daily,
+  bookingDate,
+}: {
+  daily: WeatherDay[];
+  bookingDate: string;
+}) {
+  if (!daily || daily.length === 0) return null;
+  const bookingIdx = daily.findIndex((d) => d.date === bookingDate);
+  if (bookingIdx < 0) return null;
+  // Try to show D-1 .. D+3. Clamp to available range.
+  const start = Math.max(0, bookingIdx - 1);
+  const end = Math.min(daily.length, bookingIdx + 4);
+  const slice = daily.slice(start, end);
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[10px] font-medium ${cls}`}>
-      <Icon className="h-2.5 w-2.5" />
-      {label}
-    </span>
+    <div className="mt-2 grid grid-cols-5 gap-1">
+      {slice.map((d) => {
+        const isBooking = d.date === bookingDate;
+        return (
+          <div
+            key={d.date}
+            className={`rounded-md border px-1 py-1 text-center ${SAFETY_CELL[d.safety]} ${
+              isBooking ? "ring-2 ring-brand-700 ring-offset-1 ring-offset-white" : ""
+            }`}
+            title={`${d.date}: ${d.safety} · wind ${Math.round(d.wind_max)} km/h · rain ${d.rain_pct}%`}
+          >
+            <div className="text-[9px] uppercase opacity-80">{weekdayShort(d.date)}</div>
+            <div className="text-[12px] font-bold leading-none tnum">{dayNum(d.date)}</div>
+            <div className="mt-0.5 flex items-center justify-center gap-0.5 text-[9px] tnum">
+              <Wind className="h-2 w-2" />
+              {Math.round(d.wind_max)}
+            </div>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -78,6 +126,31 @@ export default function Jobs() {
     [filter],
   );
   const jobs = (data ?? []) as JobRow[];
+
+  // Pull the latest snapshot per non-terminal job so we can draw the strip.
+  const trackableIds = useMemo(
+    () => jobs.filter((j) => !TERMINAL_STATES.has(j.state)).map((j) => j.id),
+    [jobs],
+  );
+  const [weatherByJob, setWeatherByJob] = useState<Record<string, { daily: WeatherDay[] }>>({});
+  useEffect(() => {
+    if (trackableIds.length === 0) {
+      setWeatherByJob({});
+      return;
+    }
+    let cancelled = false;
+    listLatestWeatherForJobs(trackableIds).then(({ data: rows }) => {
+      if (cancelled) return;
+      const map: Record<string, { daily: WeatherDay[] }> = {};
+      for (const r of rows ?? []) {
+        map[r.job_id] = { daily: r.daily ?? [] };
+      }
+      setWeatherByJob(map);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [trackableIds.join("|")]);
 
   return (
     <>
@@ -137,15 +210,38 @@ export default function Jobs() {
                         <Badge tone={stateTone[j.state] ?? "neutral"}>
                           {stateLabel[j.state] ?? j.state}
                         </Badge>
-                        {!TERMINAL_STATES.has(j.state) && <WeatherPill safety={j.weather_safety} />}
                       </div>
                       <div className="text-xs text-ink-500 truncate">
-                        {j.crop} · {j.area_acres} ac · {j.village ?? j.farmer?.village} · {j.scheduled_date}
+                        {j.crop} · {j.area_acres} ac · {j.village ?? j.farmer?.village} ·{" "}
+                        <span
+                          className={
+                            j.weather_safety && !TERMINAL_STATES.has(j.state)
+                              ? `font-semibold ${SAFETY_DATE_TEXT[j.weather_safety as WeatherSafety]}`
+                              : ""
+                          }
+                        >
+                          {j.scheduled_date}
+                        </span>
                       </div>
                       <div className="text-[11px] text-ink-400 truncate mt-0.5">{j.number}</div>
                     </div>
                     <ChevronRight className="h-4 w-4 text-ink-400" />
                   </div>
+
+                  {!TERMINAL_STATES.has(j.state) && weatherByJob[j.id]?.daily && (
+                    <WeatherStrip
+                      daily={weatherByJob[j.id].daily}
+                      bookingDate={j.scheduled_date}
+                    />
+                  )}
+                  {!TERMINAL_STATES.has(j.state)
+                    && !weatherByJob[j.id]?.daily
+                    && j.weather_safety && (
+                      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-500">
+                        <span className={`h-2 w-2 rounded-full ${SAFETY_DOT[j.weather_safety as WeatherSafety]}`} />
+                        Weather: {j.weather_safety}
+                      </div>
+                    )}
                 </Card>
               </Link>
             </li>

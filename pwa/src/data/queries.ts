@@ -396,6 +396,15 @@ export async function refreshWeatherForJob(jobId: string) {
   });
 }
 
+export async function listLatestWeatherForJobs(jobIds: string[]) {
+  if (jobIds.length === 0) return { data: [] as Array<{ job_id: string; daily: WeatherDay[]; booking_date_safety: WeatherSafety; fetched_at: string }>, error: null };
+  return supabase
+    .from("latest_weather_per_job")
+    .select("job_id, daily, booking_date_safety, fetched_at")
+    .in("job_id", jobIds)
+    .returns<Array<{ job_id: string; daily: WeatherDay[]; booking_date_safety: WeatherSafety; fetched_at: string }>>();
+}
+
 export async function weatherAlertsCount() {
   const today = new Date().toISOString().slice(0, 10);
   const horizon = new Date(Date.now() + 7 * 86400e3).toISOString().slice(0, 10);

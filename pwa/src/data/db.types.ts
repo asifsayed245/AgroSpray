@@ -1514,7 +1514,33 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      latest_weather_per_job: {
+        Row: {
+          booking_date_safety: string | null
+          daily: Json | null
+          fetched_at: string | null
+          job_id: string | null
+          lat: number | null
+          lng: number | null
+          tenant_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "weather_snapshots_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "weather_snapshots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       abort_sortie: {
