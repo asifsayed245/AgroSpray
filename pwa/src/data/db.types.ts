@@ -1,0 +1,1678 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          operationName?: string
+          query?: string
+          variables?: Json
+          extensions?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+  public: {
+    Tables: {
+      audit_events: {
+        Row: {
+          actor_id: string | null
+          actor_type: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          event_type: string
+          hash: string
+          id: string
+          payload: Json
+          prev_hash: string | null
+          source: Database["public"]["Enums"]["audit_source"]
+          tenant_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_type?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          event_type: string
+          hash: string
+          id?: string
+          payload?: Json
+          prev_hash?: string | null
+          source: Database["public"]["Enums"]["audit_source"]
+          tenant_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_type?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          event_type?: string
+          hash?: string
+          id?: string
+          payload?: Json
+          prev_hash?: string | null
+          source?: Database["public"]["Enums"]["audit_source"]
+          tenant_id?: string
+        }
+        Relationships: []
+      }
+      compliance_checks: {
+        Row: {
+          check_type: Database["public"]["Enums"]["compliance_check_type"]
+          created_at: string
+          id: string
+          job_id: string
+          overridden_by: string | null
+          override_reason: string | null
+          reason: string | null
+          reference_data: Json | null
+          status: Database["public"]["Enums"]["compliance_status"]
+          tenant_id: string
+        }
+        Insert: {
+          check_type: Database["public"]["Enums"]["compliance_check_type"]
+          created_at?: string
+          id?: string
+          job_id: string
+          overridden_by?: string | null
+          override_reason?: string | null
+          reason?: string | null
+          reference_data?: Json | null
+          status: Database["public"]["Enums"]["compliance_status"]
+          tenant_id: string
+        }
+        Update: {
+          check_type?: Database["public"]["Enums"]["compliance_check_type"]
+          created_at?: string
+          id?: string
+          job_id?: string
+          overridden_by?: string | null
+          override_reason?: string | null
+          reason?: string | null
+          reference_data?: Json | null
+          status?: Database["public"]["Enums"]["compliance_status"]
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_checks_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_checks_overridden_by_fkey"
+            columns: ["overridden_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_checks_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      consent_records: {
+        Row: {
+          consent_text: string
+          delete_fulfilled_at: string | null
+          delete_requested_at: string | null
+          export_fulfilled_at: string | null
+          export_requested_at: string | null
+          farmer_id: string | null
+          granted: boolean
+          granted_at: string
+          id: string
+          notice_version: string
+          profile_id: string | null
+          revoked_at: string | null
+          tenant_id: string
+        }
+        Insert: {
+          consent_text: string
+          delete_fulfilled_at?: string | null
+          delete_requested_at?: string | null
+          export_fulfilled_at?: string | null
+          export_requested_at?: string | null
+          farmer_id?: string | null
+          granted?: boolean
+          granted_at?: string
+          id?: string
+          notice_version: string
+          profile_id?: string | null
+          revoked_at?: string | null
+          tenant_id: string
+        }
+        Update: {
+          consent_text?: string
+          delete_fulfilled_at?: string | null
+          delete_requested_at?: string | null
+          export_fulfilled_at?: string | null
+          export_requested_at?: string | null
+          farmer_id?: string | null
+          granted?: boolean
+          granted_at?: string
+          id?: string
+          notice_version?: string
+          profile_id?: string | null
+          revoked_at?: string | null
+          tenant_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consent_records_farmer_id_fkey"
+            columns: ["farmer_id"]
+            isOneToOne: false
+            referencedRelation: "farmers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consent_records_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consent_records_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crops: {
+        Row: {
+          aliases: string[]
+          default_volume_per_acre_l: number
+          id: string
+          name_en: string
+          name_hi: string | null
+          name_mr: string | null
+        }
+        Insert: {
+          aliases?: string[]
+          default_volume_per_acre_l?: number
+          id: string
+          name_en: string
+          name_hi?: string | null
+          name_mr?: string | null
+        }
+        Update: {
+          aliases?: string[]
+          default_volume_per_acre_l?: number
+          id?: string
+          name_en?: string
+          name_hi?: string | null
+          name_mr?: string | null
+        }
+        Relationships: []
+      }
+      drones: {
+        Row: {
+          battery_cycles: number
+          battery_health: string | null
+          created_at: string
+          current_job_id: string | null
+          display_id: string
+          hours_flown: number
+          hours_since_service: number
+          id: string
+          insurance_expiry: string | null
+          insurance_ref: string | null
+          last_calibration_at: string | null
+          manufacturer: string | null
+          model: string | null
+          payload_l: number | null
+          pesticide_compat: string[]
+          service_threshold_hours: number
+          status: Database["public"]["Enums"]["drone_status"]
+          tenant_id: string
+          uin: string
+          updated_at: string
+          version: number
+          year: number | null
+        }
+        Insert: {
+          battery_cycles?: number
+          battery_health?: string | null
+          created_at?: string
+          current_job_id?: string | null
+          display_id: string
+          hours_flown?: number
+          hours_since_service?: number
+          id?: string
+          insurance_expiry?: string | null
+          insurance_ref?: string | null
+          last_calibration_at?: string | null
+          manufacturer?: string | null
+          model?: string | null
+          payload_l?: number | null
+          pesticide_compat?: string[]
+          service_threshold_hours?: number
+          status?: Database["public"]["Enums"]["drone_status"]
+          tenant_id: string
+          uin: string
+          updated_at?: string
+          version?: number
+          year?: number | null
+        }
+        Update: {
+          battery_cycles?: number
+          battery_health?: string | null
+          created_at?: string
+          current_job_id?: string | null
+          display_id?: string
+          hours_flown?: number
+          hours_since_service?: number
+          id?: string
+          insurance_expiry?: string | null
+          insurance_ref?: string | null
+          last_calibration_at?: string | null
+          manufacturer?: string | null
+          model?: string | null
+          payload_l?: number | null
+          pesticide_compat?: string[]
+          service_threshold_hours?: number
+          status?: Database["public"]["Enums"]["drone_status"]
+          tenant_id?: string
+          uin?: string
+          updated_at?: string
+          version?: number
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drones_current_job_fk"
+            columns: ["current_job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drones_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      farmers: {
+        Row: {
+          booking_count: number
+          consent_id: string | null
+          created_at: string
+          default_language: string
+          district: string | null
+          id: string
+          known_locations: Json
+          last_booking_at: string | null
+          name: string
+          phone: string | null
+          profile_id: string | null
+          state: string | null
+          telegram_id: string | null
+          tenant_id: string
+          updated_at: string
+          version: number
+          village: string | null
+        }
+        Insert: {
+          booking_count?: number
+          consent_id?: string | null
+          created_at?: string
+          default_language?: string
+          district?: string | null
+          id?: string
+          known_locations?: Json
+          last_booking_at?: string | null
+          name: string
+          phone?: string | null
+          profile_id?: string | null
+          state?: string | null
+          telegram_id?: string | null
+          tenant_id: string
+          updated_at?: string
+          version?: number
+          village?: string | null
+        }
+        Update: {
+          booking_count?: number
+          consent_id?: string | null
+          created_at?: string
+          default_language?: string
+          district?: string | null
+          id?: string
+          known_locations?: Json
+          last_booking_at?: string | null
+          name?: string
+          phone?: string | null
+          profile_id?: string | null
+          state?: string | null
+          telegram_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+          version?: number
+          village?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "farmers_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "farmers_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incidents: {
+        Row: {
+          created_at: string
+          description: string | null
+          dgca_notification_ref: string | null
+          dgca_notified_at: string | null
+          dgca_reportable: boolean
+          id: string
+          linked_drone_id: string | null
+          linked_job_id: string | null
+          linked_pilot_id: string | null
+          location_lat: number | null
+          location_lng: number | null
+          parties_involved: string[]
+          photos: Json
+          reported_by: string | null
+          resolution_notes: string | null
+          severity: Database["public"]["Enums"]["incident_severity"]
+          tenant_id: string
+          third_party_affected: string | null
+          type: Database["public"]["Enums"]["incident_type"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          dgca_notification_ref?: string | null
+          dgca_notified_at?: string | null
+          dgca_reportable?: boolean
+          id?: string
+          linked_drone_id?: string | null
+          linked_job_id?: string | null
+          linked_pilot_id?: string | null
+          location_lat?: number | null
+          location_lng?: number | null
+          parties_involved?: string[]
+          photos?: Json
+          reported_by?: string | null
+          resolution_notes?: string | null
+          severity: Database["public"]["Enums"]["incident_severity"]
+          tenant_id: string
+          third_party_affected?: string | null
+          type: Database["public"]["Enums"]["incident_type"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          dgca_notification_ref?: string | null
+          dgca_notified_at?: string | null
+          dgca_reportable?: boolean
+          id?: string
+          linked_drone_id?: string | null
+          linked_job_id?: string | null
+          linked_pilot_id?: string | null
+          location_lat?: number | null
+          location_lng?: number | null
+          parties_involved?: string[]
+          photos?: Json
+          reported_by?: string | null
+          resolution_notes?: string | null
+          severity?: Database["public"]["Enums"]["incident_severity"]
+          tenant_id?: string
+          third_party_affected?: string | null
+          type?: Database["public"]["Enums"]["incident_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incidents_linked_drone_id_fkey"
+            columns: ["linked_drone_id"]
+            isOneToOne: false
+            referencedRelation: "drones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incidents_linked_job_id_fkey"
+            columns: ["linked_job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incidents_linked_pilot_id_fkey"
+            columns: ["linked_pilot_id"]
+            isOneToOne: false
+            referencedRelation: "pilots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incidents_reported_by_fkey"
+            columns: ["reported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incidents_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          created_at: string
+          id: string
+          job_id: string
+          line_items: Json
+          number: string
+          paid_at: string | null
+          paid_by_method: string | null
+          paid_reference: string | null
+          subtotal: number
+          tax_total: number
+          tenant_id: string
+          total: number
+          updated_at: string
+          upi_qr_payload: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          job_id: string
+          line_items: Json
+          number: string
+          paid_at?: string | null
+          paid_by_method?: string | null
+          paid_reference?: string | null
+          subtotal: number
+          tax_total: number
+          tenant_id: string
+          total: number
+          updated_at?: string
+          upi_qr_payload?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          job_id?: string
+          line_items?: Json
+          number?: string
+          paid_at?: string | null
+          paid_by_method?: string | null
+          paid_reference?: string | null
+          subtotal?: number
+          tax_total?: number
+          tenant_id?: string
+          total?: number
+          updated_at?: string
+          upi_qr_payload?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jobs: {
+        Row: {
+          area: number
+          area_acres: number
+          area_unit: Database["public"]["Enums"]["area_unit"]
+          assigned_drone_id: string | null
+          assigned_pilot_id: string | null
+          cancel_reason: string | null
+          created_at: string
+          crop: string
+          farmer_id: string
+          id: string
+          location_lat: number | null
+          location_lng: number | null
+          location_polygon: Json | null
+          number: string
+          override_reason: string | null
+          pesticide_brand: string | null
+          pesticide_name: string | null
+          pricing_snapshot: Json | null
+          reschedule_count: number
+          scheduled_date: string
+          spray_type: string | null
+          state: Database["public"]["Enums"]["job_state"]
+          state_history: Json
+          tenant_id: string
+          updated_at: string
+          version: number
+          village: string | null
+        }
+        Insert: {
+          area: number
+          area_acres: number
+          area_unit?: Database["public"]["Enums"]["area_unit"]
+          assigned_drone_id?: string | null
+          assigned_pilot_id?: string | null
+          cancel_reason?: string | null
+          created_at?: string
+          crop: string
+          farmer_id: string
+          id?: string
+          location_lat?: number | null
+          location_lng?: number | null
+          location_polygon?: Json | null
+          number: string
+          override_reason?: string | null
+          pesticide_brand?: string | null
+          pesticide_name?: string | null
+          pricing_snapshot?: Json | null
+          reschedule_count?: number
+          scheduled_date: string
+          spray_type?: string | null
+          state?: Database["public"]["Enums"]["job_state"]
+          state_history?: Json
+          tenant_id: string
+          updated_at?: string
+          version?: number
+          village?: string | null
+        }
+        Update: {
+          area?: number
+          area_acres?: number
+          area_unit?: Database["public"]["Enums"]["area_unit"]
+          assigned_drone_id?: string | null
+          assigned_pilot_id?: string | null
+          cancel_reason?: string | null
+          created_at?: string
+          crop?: string
+          farmer_id?: string
+          id?: string
+          location_lat?: number | null
+          location_lng?: number | null
+          location_polygon?: Json | null
+          number?: string
+          override_reason?: string | null
+          pesticide_brand?: string | null
+          pesticide_name?: string | null
+          pricing_snapshot?: Json | null
+          reschedule_count?: number
+          scheduled_date?: string
+          spray_type?: string | null
+          state?: Database["public"]["Enums"]["job_state"]
+          state_history?: Json
+          tenant_id?: string
+          updated_at?: string
+          version?: number
+          village?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jobs_assigned_drone_id_fkey"
+            columns: ["assigned_drone_id"]
+            isOneToOne: false
+            referencedRelation: "drones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_assigned_pilot_id_fkey"
+            columns: ["assigned_pilot_id"]
+            isOneToOne: false
+            referencedRelation: "pilots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_farmer_id_fkey"
+            columns: ["farmer_id"]
+            isOneToOne: false
+            referencedRelation: "farmers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          body: string | null
+          category: string
+          created_at: string
+          delivered_at: string | null
+          delivery_channel: string
+          delivery_status: string
+          error: string | null
+          id: string
+          payload: Json | null
+          read_at: string | null
+          recipient_farmer_id: string | null
+          recipient_telegram_id: string | null
+          recipient_user_id: string | null
+          retries: number
+          scheduled_at: string | null
+          sent_at: string | null
+          tenant_id: string
+          title: string | null
+        }
+        Insert: {
+          body?: string | null
+          category: string
+          created_at?: string
+          delivered_at?: string | null
+          delivery_channel?: string
+          delivery_status?: string
+          error?: string | null
+          id?: string
+          payload?: Json | null
+          read_at?: string | null
+          recipient_farmer_id?: string | null
+          recipient_telegram_id?: string | null
+          recipient_user_id?: string | null
+          retries?: number
+          scheduled_at?: string | null
+          sent_at?: string | null
+          tenant_id: string
+          title?: string | null
+        }
+        Update: {
+          body?: string | null
+          category?: string
+          created_at?: string
+          delivered_at?: string | null
+          delivery_channel?: string
+          delivery_status?: string
+          error?: string | null
+          id?: string
+          payload?: Json | null
+          read_at?: string | null
+          recipient_farmer_id?: string | null
+          recipient_telegram_id?: string | null
+          recipient_user_id?: string | null
+          retries?: number
+          scheduled_at?: string | null
+          sent_at?: string | null
+          tenant_id?: string
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_recipient_farmer_id_fkey"
+            columns: ["recipient_farmer_id"]
+            isOneToOne: false
+            referencedRelation: "farmers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_recipient_user_id_fkey"
+            columns: ["recipient_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pesticides_cib: {
+        Row: {
+          active_ingredient: string | null
+          approved_crops: string[]
+          brand: string | null
+          drone_approved: boolean
+          id: string
+          name: string
+          notes: string | null
+          phi_days_by_crop: Json
+        }
+        Insert: {
+          active_ingredient?: string | null
+          approved_crops?: string[]
+          brand?: string | null
+          drone_approved?: boolean
+          id?: string
+          name: string
+          notes?: string | null
+          phi_days_by_crop?: Json
+        }
+        Update: {
+          active_ingredient?: string | null
+          approved_crops?: string[]
+          brand?: string | null
+          drone_approved?: boolean
+          id?: string
+          name?: string
+          notes?: string | null
+          phi_days_by_crop?: Json
+        }
+        Relationships: []
+      }
+      pilots: {
+        Row: {
+          alt_phone: string | null
+          certified_drone_classes: string[]
+          created_at: string
+          employment_status: string
+          id: string
+          joined_date: string | null
+          name: string
+          phone: string | null
+          profile_id: string | null
+          rpc_expiry: string | null
+          rpc_number: string
+          telegram_id: string | null
+          tenant_id: string
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          alt_phone?: string | null
+          certified_drone_classes?: string[]
+          created_at?: string
+          employment_status?: string
+          id?: string
+          joined_date?: string | null
+          name: string
+          phone?: string | null
+          profile_id?: string | null
+          rpc_expiry?: string | null
+          rpc_number: string
+          telegram_id?: string | null
+          tenant_id: string
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          alt_phone?: string | null
+          certified_drone_classes?: string[]
+          created_at?: string
+          employment_status?: string
+          id?: string
+          joined_date?: string | null
+          name?: string
+          phone?: string | null
+          profile_id?: string | null
+          rpc_expiry?: string | null
+          rpc_number?: string
+          telegram_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pilots_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pilots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          phone: string | null
+          role: Database["public"]["Enums"]["user_role"]
+          status: string
+          telegram_id: string | null
+          tenant_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id: string
+          phone?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          status?: string
+          telegram_id?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          status?: string
+          telegram_id?: string | null
+          tenant_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_subscriptions: {
+        Row: {
+          categories: string[]
+          created_at: string
+          endpoint: string
+          id: string
+          keys_auth: string
+          keys_p256dh: string
+          tenant_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          categories?: string[]
+          created_at?: string
+          endpoint: string
+          id?: string
+          keys_auth: string
+          keys_p256dh: string
+          tenant_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          categories?: string[]
+          created_at?: string
+          endpoint?: string
+          id?: string
+          keys_auth?: string
+          keys_p256dh?: string
+          tenant_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      slots: {
+        Row: {
+          booked: number
+          capacity: number
+          created_at: string
+          date: string
+          id: string
+          locked: number
+          notes: string | null
+          tenant_id: string
+          unavailable: boolean
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          booked?: number
+          capacity: number
+          created_at?: string
+          date: string
+          id?: string
+          locked?: number
+          notes?: string | null
+          tenant_id: string
+          unavailable?: boolean
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          booked?: number
+          capacity?: number
+          created_at?: string
+          date?: string
+          id?: string
+          locked?: number
+          notes?: string | null
+          tenant_id?: string
+          unavailable?: boolean
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slots_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sorties: {
+        Row: {
+          aborted_reason: string | null
+          area_covered_acres: number | null
+          created_at: string
+          drone_id: string | null
+          gps_centroid_lat: number | null
+          gps_centroid_lng: number | null
+          gps_track: Json | null
+          id: string
+          job_id: string
+          landing_at: string | null
+          npnt_permission_ref: string | null
+          pilot_id: string | null
+          sortie_number: number
+          state: Database["public"]["Enums"]["sortie_state"]
+          takeoff_at: string | null
+          telemetry_blob_url: string | null
+          tenant_id: string
+          updated_at: string
+          volume_sprayed_l: number | null
+        }
+        Insert: {
+          aborted_reason?: string | null
+          area_covered_acres?: number | null
+          created_at?: string
+          drone_id?: string | null
+          gps_centroid_lat?: number | null
+          gps_centroid_lng?: number | null
+          gps_track?: Json | null
+          id?: string
+          job_id: string
+          landing_at?: string | null
+          npnt_permission_ref?: string | null
+          pilot_id?: string | null
+          sortie_number: number
+          state?: Database["public"]["Enums"]["sortie_state"]
+          takeoff_at?: string | null
+          telemetry_blob_url?: string | null
+          tenant_id: string
+          updated_at?: string
+          volume_sprayed_l?: number | null
+        }
+        Update: {
+          aborted_reason?: string | null
+          area_covered_acres?: number | null
+          created_at?: string
+          drone_id?: string | null
+          gps_centroid_lat?: number | null
+          gps_centroid_lng?: number | null
+          gps_track?: Json | null
+          id?: string
+          job_id?: string
+          landing_at?: string | null
+          npnt_permission_ref?: string | null
+          pilot_id?: string | null
+          sortie_number?: number
+          state?: Database["public"]["Enums"]["sortie_state"]
+          takeoff_at?: string | null
+          telemetry_blob_url?: string | null
+          tenant_id?: string
+          updated_at?: string
+          volume_sprayed_l?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sorties_drone_id_fkey"
+            columns: ["drone_id"]
+            isOneToOne: false
+            referencedRelation: "drones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sorties_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sorties_pilot_id_fkey"
+            columns: ["pilot_id"]
+            isOneToOne: false
+            referencedRelation: "pilots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sorties_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenants: {
+        Row: {
+          activated_at: string | null
+          bank_account: string | null
+          cancellation_policy: Json
+          created_at: string
+          default_language: string
+          dgca_operator_uin: string | null
+          gstin: string | null
+          id: string
+          name: string
+          notification_prefs: Json
+          pan: string | null
+          pricing_defaults: Json
+          registered_address: string | null
+          slug: string
+          state: string | null
+          telegram_bot_token: string | null
+          telegram_ops_chat_id: string | null
+          timezone: string
+          updated_at: string
+          upi_vpa: string | null
+          version: number
+          weather_policy: Json
+        }
+        Insert: {
+          activated_at?: string | null
+          bank_account?: string | null
+          cancellation_policy?: Json
+          created_at?: string
+          default_language?: string
+          dgca_operator_uin?: string | null
+          gstin?: string | null
+          id?: string
+          name: string
+          notification_prefs?: Json
+          pan?: string | null
+          pricing_defaults?: Json
+          registered_address?: string | null
+          slug: string
+          state?: string | null
+          telegram_bot_token?: string | null
+          telegram_ops_chat_id?: string | null
+          timezone?: string
+          updated_at?: string
+          upi_vpa?: string | null
+          version?: number
+          weather_policy?: Json
+        }
+        Update: {
+          activated_at?: string | null
+          bank_account?: string | null
+          cancellation_policy?: Json
+          created_at?: string
+          default_language?: string
+          dgca_operator_uin?: string | null
+          gstin?: string | null
+          id?: string
+          name?: string
+          notification_prefs?: Json
+          pan?: string | null
+          pricing_defaults?: Json
+          registered_address?: string | null
+          slug?: string
+          state?: string | null
+          telegram_bot_token?: string | null
+          telegram_ops_chat_id?: string | null
+          timezone?: string
+          updated_at?: string
+          upi_vpa?: string | null
+          version?: number
+          weather_policy?: Json
+        }
+        Relationships: []
+      }
+      wishlist_entries: {
+        Row: {
+          area_acres: number | null
+          confirmed_at: string | null
+          created_at: string
+          crop: string | null
+          farmer_id: string
+          id: string
+          notified_at: string | null
+          preferred_date: string
+          status: Database["public"]["Enums"]["wishlist_status"]
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          area_acres?: number | null
+          confirmed_at?: string | null
+          created_at?: string
+          crop?: string | null
+          farmer_id: string
+          id?: string
+          notified_at?: string | null
+          preferred_date: string
+          status?: Database["public"]["Enums"]["wishlist_status"]
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          area_acres?: number | null
+          confirmed_at?: string | null
+          created_at?: string
+          crop?: string | null
+          farmer_id?: string
+          id?: string
+          notified_at?: string | null
+          preferred_date?: string
+          status?: Database["public"]["Enums"]["wishlist_status"]
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wishlist_entries_farmer_id_fkey"
+            columns: ["farmer_id"]
+            isOneToOne: false
+            referencedRelation: "farmers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wishlist_entries_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      assign_crew: {
+        Args: {
+          p_job_id: string
+          p_pilot_id: string
+          p_drone_id: string
+        }
+        Returns: {
+          area: number
+          area_acres: number
+          area_unit: Database["public"]["Enums"]["area_unit"]
+          assigned_drone_id: string | null
+          assigned_pilot_id: string | null
+          cancel_reason: string | null
+          created_at: string
+          crop: string
+          farmer_id: string
+          id: string
+          location_lat: number | null
+          location_lng: number | null
+          location_polygon: Json | null
+          number: string
+          override_reason: string | null
+          pesticide_brand: string | null
+          pesticide_name: string | null
+          pricing_snapshot: Json | null
+          reschedule_count: number
+          scheduled_date: string
+          spray_type: string | null
+          state: Database["public"]["Enums"]["job_state"]
+          state_history: Json
+          tenant_id: string
+          updated_at: string
+          version: number
+          village: string | null
+        }
+      }
+      calculate_pricing: {
+        Args: {
+          p_job_id: string
+        }
+        Returns: Json
+      }
+      cancel_job: {
+        Args: {
+          p_job_id: string
+          p_reason: string
+        }
+        Returns: {
+          area: number
+          area_acres: number
+          area_unit: Database["public"]["Enums"]["area_unit"]
+          assigned_drone_id: string | null
+          assigned_pilot_id: string | null
+          cancel_reason: string | null
+          created_at: string
+          crop: string
+          farmer_id: string
+          id: string
+          location_lat: number | null
+          location_lng: number | null
+          location_polygon: Json | null
+          number: string
+          override_reason: string | null
+          pesticide_brand: string | null
+          pesticide_name: string | null
+          pricing_snapshot: Json | null
+          reschedule_count: number
+          scheduled_date: string
+          spray_type: string | null
+          state: Database["public"]["Enums"]["job_state"]
+          state_history: Json
+          tenant_id: string
+          updated_at: string
+          version: number
+          village: string | null
+        }
+      }
+      complete_job: {
+        Args: {
+          p_job_id: string
+        }
+        Returns: {
+          area: number
+          area_acres: number
+          area_unit: Database["public"]["Enums"]["area_unit"]
+          assigned_drone_id: string | null
+          assigned_pilot_id: string | null
+          cancel_reason: string | null
+          created_at: string
+          crop: string
+          farmer_id: string
+          id: string
+          location_lat: number | null
+          location_lng: number | null
+          location_polygon: Json | null
+          number: string
+          override_reason: string | null
+          pesticide_brand: string | null
+          pesticide_name: string | null
+          pricing_snapshot: Json | null
+          reschedule_count: number
+          scheduled_date: string
+          spray_type: string | null
+          state: Database["public"]["Enums"]["job_state"]
+          state_history: Json
+          tenant_id: string
+          updated_at: string
+          version: number
+          village: string | null
+        }
+      }
+      current_tenant_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      current_user_role: {
+        Args: Record<PropertyKey, never>
+        Returns: Database["public"]["Enums"]["user_role"]
+      }
+      ensure_slot: {
+        Args: {
+          p_tenant_id: string
+          p_date: string
+          p_capacity: number
+        }
+        Returns: {
+          booked: number
+          capacity: number
+          created_at: string
+          date: string
+          id: string
+          locked: number
+          notes: string | null
+          tenant_id: string
+          unavailable: boolean
+          updated_at: string
+          version: number
+        }
+      }
+      generate_job_number: {
+        Args: {
+          p_tenant_id: string
+          p_crop: string
+          p_date: string
+        }
+        Returns: string
+      }
+      has_admin_role: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      has_override_role: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      override_state: {
+        Args: {
+          p_job_id: string
+          p_new_state: Database["public"]["Enums"]["job_state"]
+          p_reason: string
+        }
+        Returns: {
+          area: number
+          area_acres: number
+          area_unit: Database["public"]["Enums"]["area_unit"]
+          assigned_drone_id: string | null
+          assigned_pilot_id: string | null
+          cancel_reason: string | null
+          created_at: string
+          crop: string
+          farmer_id: string
+          id: string
+          location_lat: number | null
+          location_lng: number | null
+          location_polygon: Json | null
+          number: string
+          override_reason: string | null
+          pesticide_brand: string | null
+          pesticide_name: string | null
+          pricing_snapshot: Json | null
+          reschedule_count: number
+          scheduled_date: string
+          spray_type: string | null
+          state: Database["public"]["Enums"]["job_state"]
+          state_history: Json
+          tenant_id: string
+          updated_at: string
+          version: number
+          village: string | null
+        }
+      }
+      reconcile_job: {
+        Args: {
+          p_job_id: string
+        }
+        Returns: boolean
+      }
+      release_slot: {
+        Args: {
+          p_tenant_id: string
+          p_date: string
+        }
+        Returns: undefined
+      }
+      reserve_slot: {
+        Args: {
+          p_tenant_id: string
+          p_date: string
+        }
+        Returns: boolean
+      }
+      run_compliance_checks: {
+        Args: {
+          p_job_id: string
+        }
+        Returns: boolean
+      }
+      submit_job_for_compliance: {
+        Args: {
+          p_job_id: string
+        }
+        Returns: {
+          area: number
+          area_acres: number
+          area_unit: Database["public"]["Enums"]["area_unit"]
+          assigned_drone_id: string | null
+          assigned_pilot_id: string | null
+          cancel_reason: string | null
+          created_at: string
+          crop: string
+          farmer_id: string
+          id: string
+          location_lat: number | null
+          location_lng: number | null
+          location_polygon: Json | null
+          number: string
+          override_reason: string | null
+          pesticide_brand: string | null
+          pesticide_name: string | null
+          pricing_snapshot: Json | null
+          reschedule_count: number
+          scheduled_date: string
+          spray_type: string | null
+          state: Database["public"]["Enums"]["job_state"]
+          state_history: Json
+          tenant_id: string
+          updated_at: string
+          version: number
+          village: string | null
+        }
+      }
+      write_audit: {
+        Args: {
+          p_tenant_id: string
+          p_actor_id: string
+          p_actor_type: string
+          p_source: Database["public"]["Enums"]["audit_source"]
+          p_entity_type: string
+          p_entity_id: string
+          p_event_type: string
+          p_payload: Json
+        }
+        Returns: string
+      }
+    }
+    Enums: {
+      area_unit: "acre" | "hectare" | "bigha" | "guntha" | "kanal" | "ghumao"
+      audit_source: "auto" | "manual" | "override"
+      compliance_check_type:
+        | "dgca_uin"
+        | "dgca_rpc"
+        | "cib_pesticide"
+        | "npnt"
+        | "pricing"
+      compliance_status: "pass" | "fail" | "overridden"
+      drone_status: "ready" | "in_flight" | "maintenance" | "out_of_service"
+      incident_severity: "low" | "medium" | "high" | "critical"
+      incident_type:
+        | "crash"
+        | "drift"
+        | "injury"
+        | "equipment_failure"
+        | "near_miss"
+      job_state:
+        | "draft"
+        | "compliance"
+        | "confirmed"
+        | "crew_assigned"
+        | "in_progress"
+        | "complete"
+        | "invoiced"
+        | "paid"
+        | "wishlist"
+        | "comp_fail"
+        | "cancelled"
+        | "failed"
+        | "disputed"
+      sortie_state: "pending" | "pre_flight" | "active" | "closed" | "aborted"
+      user_role:
+        | "owner"
+        | "admin"
+        | "operations"
+        | "accountant"
+        | "support"
+        | "viewer"
+        | "pilot"
+        | "farmer"
+      wishlist_status:
+        | "waiting"
+        | "notified"
+        | "confirmed"
+        | "expired"
+        | "cancelled"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type PublicSchema = Database[Extract<keyof Database, "public">]
+
+export type Tables<
+  PublicTableNameOrOptions extends
+    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+        Database[PublicTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
+        PublicSchema["Views"])
+    ? (PublicSchema["Tables"] &
+        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  PublicTableNameOrOptions extends
+    | keyof PublicSchema["Tables"]
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
+    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  PublicTableNameOrOptions extends
+    | keyof PublicSchema["Tables"]
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
+    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  PublicEnumNameOrOptions extends
+    | keyof PublicSchema["Enums"]
+    | { schema: keyof Database },
+  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = PublicEnumNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
+    ? PublicSchema["Enums"][PublicEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof PublicSchema["CompositeTypes"]
+    | { schema: keyof Database },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
+    ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+

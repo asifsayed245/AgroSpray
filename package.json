@@ -1,0 +1,18 @@
+{
+  "name": "agrospray",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AgroSpray drone-service platform — backend tooling (Supabase CLI) + workspace root.",
+  "scripts": {
+    "db:start": "supabase start",
+    "db:stop": "supabase stop",
+    "db:status": "supabase status",
+    "db:reset": "supabase db reset",
+    "db:diff": "supabase db diff -f",
+    "db:push": "supabase db push",
+    "db:types": "supabase gen types typescript --local > pwa/src/data/db.types.ts"
+  },
+  "devDependencies": {
+    "supabase": "^1.226.4"
+  }
+}
