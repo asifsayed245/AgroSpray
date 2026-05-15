@@ -1,9 +1,9 @@
-// AgroSpray farmer-facing Telegram bot — MVP webhook handler.
-// Receives Telegram updates, runs a state-machine conversation, books spray jobs.
+// AgroSpray farmer-facing Telegram bot — multilingual (en / hi / mr).
 //
 // Conversation states:
-//   idle → awaiting_consent → awaiting_crop → awaiting_area → awaiting_date
-//        → awaiting_village → awaiting_spray_type → awaiting_confirm → (commits) → idle
+//   idle → awaiting_language → awaiting_consent → awaiting_name → awaiting_phone
+//        → awaiting_crop → awaiting_area → awaiting_date → awaiting_village
+//        → awaiting_spray_type → awaiting_confirm → (commits) → idle
 
 // @ts-expect-error  Deno-only import resolved at deploy time
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -18,47 +18,12 @@ const supa = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-// ────────────────────────────────────────────────────────────────
-// Strings (English only for MVP — expand to hi/mr later)
-// ────────────────────────────────────────────────────────────────
-const T = {
-  welcome: (name: string) =>
-    `🌾 Hi ${name}! I'm the AgroSpray booking bot for *Sahyadri Agri Drones*.\n\nI can book a drone spray for your field in under a minute.`,
-  consent:
-    "Before we start: we'll store your name, phone, location and booking details to fulfil the spray and meet DGCA + DPDP rules. Data stays in India.\n\nTap *Accept* to continue.",
-  consentAccepted: "Great, thanks! Let's start.",
-  askName: "What's your *full name*? (so our pilot knows who to call)",
-  askPhone:
-    "What's the *phone number* we should reach you on?\n(10-digit Indian mobile, e.g. `9876543210`)",
-  hiAgain: (name: string) =>
-    `Welcome back, ${name}! 👋 Let's get your next spray booked.`,
-  askCrop: "What's the crop?",
-  askArea: "How many *acres* are we spraying?\n(Just type the number — e.g. `12`)",
-  askDate: "Which day works for you?",
-  askVillage: "Which village is the field in?",
-  askSprayType: "What kind of spray?",
-  askConfirm: (d: Draft) =>
-    `*Please confirm:*\n` +
-    `• Name: ${d.name ?? "—"}\n` +
-    `• Phone: ${d.phone ?? "—"}\n` +
-    `• Crop: ${d.crop}\n` +
-    `• Area: ${d.area_acres} acres\n` +
-    `• Date: ${d.scheduled_date}\n` +
-    `• Village: ${d.village}\n` +
-    `• Spray: ${d.spray_type}\n\n` +
-    `Tap *Confirm* to book.`,
-  confirmed: (n: string, total: string) =>
-    `✅ *Booking confirmed!*\nJob: \`${n}\`\nEstimated total: ₹${total}\n\nOur ops team will assign a crew and reach out before the visit.`,
-  wishlisted: (n: string) =>
-    `⏳ All slots are full for that day. You're on the wishlist (job \`${n}\`). We'll message you if a slot opens up.`,
-  compFail: (n: string) =>
-    `⚠️ Booking *${n}* needs a manual review — usually a compliance check (pesticide / pilot RPC / drone). Our team will call you shortly.`,
-  fallback:
-    "Sorry, I didn't catch that. Send /start to begin a new booking, or /cancel to abort the current one.",
-  cancelled: "Cancelled. Send /start anytime to book a new spray.",
-  notNumber: "Please send a number — e.g. `12` for 12 acres.",
-  notValidName: "Please send your full name (at least 2 letters).",
-  notValidPhone: "Please send a valid 10-digit Indian mobile number — e.g. `9876543210`.",
+type Lang = "en" | "hi" | "mr";
+const LANGS: Lang[] = ["en", "hi", "mr"];
+const LANG_LABEL: Record<Lang, string> = {
+  en: "English",
+  hi: "हिन्दी",
+  mr: "मराठी",
 };
 
 type Draft = {
@@ -71,19 +36,233 @@ type Draft = {
   spray_type?: string;
 };
 
+// ────────────────────────────────────────────────────────────────
+// String tables — one per language
+// ────────────────────────────────────────────────────────────────
+type Strings = {
+  askLanguage: string;
+  welcome: (name: string) => string;
+  consent: string;
+  consentAccepted: string;
+  hiAgain: (name: string) => string;
+  askName: string;
+  askPhone: string;
+  askCrop: string;
+  askArea: string;
+  askDate: string;
+  askVillage: string;
+  askSprayType: string;
+  askConfirm: (d: Draft) => string;
+  confirmed: (n: string, total: string) => string;
+  wishlisted: (n: string) => string;
+  compFail: (n: string) => string;
+  cancelled: string;
+  notNumber: string;
+  notValidName: string;
+  notValidPhone: string;
+  acceptBtn: string;
+  confirmBtn: string;
+  cancelBtn: string;
+  todayLabel: string;
+  tomorrowLabel: string;
+  fieldName: string;
+  fieldPhone: string;
+  fieldCrop: string;
+  fieldArea: string;
+  fieldDate: string;
+  fieldVillage: string;
+  fieldSpray: string;
+  acres: string;
+};
+
+const STRINGS: Record<Lang, Strings> = {
+  en: {
+    askLanguage: "Which language would you like to use?\nकौन सी भाषा? / कोणती भाषा?",
+    welcome: (n) =>
+      `🌾 Hi ${n}! I'm the AgroSpray booking bot for *Sahyadri Agri Drones*.\n\nI can book a drone spray for your field in under a minute.`,
+    consent:
+      "Before we start: we'll store your name, phone, location and booking details to fulfil the spray and meet DGCA + DPDP rules. Data stays in India.\n\nTap *Accept* to continue.",
+    consentAccepted: "Great, thanks! Let's start.",
+    hiAgain: (n) => `Welcome back, ${n}! 👋 Let's get your next spray booked.`,
+    askName: "What's your *full name*? (so our pilot knows who to call)",
+    askPhone:
+      "What's the *phone number* we should reach you on?\n(10-digit Indian mobile, e.g. `9876543210`)",
+    askCrop: "What's the crop?",
+    askArea: "How many *acres* are we spraying?\n(Just type the number — e.g. `12`)",
+    askDate: "Which day works for you?",
+    askVillage: "Which village is the field in?",
+    askSprayType: "What kind of spray?",
+    askConfirm: (d) =>
+      `*Please confirm:*\n` +
+      `• Name: ${d.name ?? "—"}\n` +
+      `• Phone: ${d.phone ?? "—"}\n` +
+      `• Crop: ${d.crop}\n` +
+      `• Area: ${d.area_acres} acres\n` +
+      `• Date: ${d.scheduled_date}\n` +
+      `• Village: ${d.village}\n` +
+      `• Spray: ${d.spray_type}\n\nTap *Confirm* to book.`,
+    confirmed: (n, total) =>
+      `✅ *Booking confirmed!*\nJob: \`${n}\`\nEstimated total: ₹${total}\n\nOur ops team will assign a crew and reach out before the visit.`,
+    wishlisted: (n) =>
+      `⏳ All slots are full for that day. You're on the wishlist (job \`${n}\`). We'll message you if a slot opens up.`,
+    compFail: (n) =>
+      `⚠️ Booking *${n}* needs a manual review — usually a compliance check (pesticide / pilot RPC / drone). Our team will call you shortly.`,
+    cancelled: "Cancelled. Send /start anytime to book a new spray.",
+    notNumber: "Please send a number — e.g. `12` for 12 acres.",
+    notValidName: "Please send your full name (at least 2 letters).",
+    notValidPhone: "Please send a valid 10-digit Indian mobile number — e.g. `9876543210`.",
+    acceptBtn: "✅ Accept",
+    confirmBtn: "✅ Confirm",
+    cancelBtn: "❌ Cancel",
+    todayLabel: "Today",
+    tomorrowLabel: "Tomorrow",
+    fieldName: "Name",
+    fieldPhone: "Phone",
+    fieldCrop: "Crop",
+    fieldArea: "Area",
+    fieldDate: "Date",
+    fieldVillage: "Village",
+    fieldSpray: "Spray",
+    acres: "acres",
+  },
+  hi: {
+    askLanguage: "आप कौन सी भाषा में बात करना चाहेंगे?",
+    welcome: (n) =>
+      `🌾 नमस्ते ${n}! मैं *सह्याद्री एग्री ड्रोन्स* का AgroSpray बुकिंग बॉट हूँ।\n\nमिनटों में अपने खेत के लिए ड्रोन स्प्रे बुक करें।`,
+    consent:
+      "शुरू करने से पहले: हम आपका नाम, फोन, स्थान और बुकिंग की जानकारी DGCA और DPDP नियमों के अनुसार सुरक्षित रखेंगे। डेटा भारत में ही रहेगा।\n\nजारी रखने के लिए *स्वीकार करें* दबाएँ।",
+    consentAccepted: "बहुत अच्छा, शुक्रिया! शुरू करते हैं।",
+    hiAgain: (n) => `वापसी पर स्वागत है, ${n}! 👋 अपनी अगली स्प्रे बुक करें।`,
+    askName: "आपका *पूरा नाम* क्या है? (ताकि हमारा पायलट आपसे संपर्क कर सके)",
+    askPhone:
+      "हम आपसे किस *फोन नंबर* पर संपर्क करें?\n(10 अंकों का भारतीय मोबाइल, जैसे `9876543210`)",
+    askCrop: "कौन सी फसल है?",
+    askArea: "कितने *एकड़* में स्प्रे करना है?\n(सिर्फ संख्या लिखें — जैसे `12`)",
+    askDate: "कौन सा दिन ठीक रहेगा?",
+    askVillage: "खेत किस गाँव में है?",
+    askSprayType: "कौन सा स्प्रे करना है?",
+    askConfirm: (d) =>
+      `*कृपया पुष्टि करें:*\n` +
+      `• नाम: ${d.name ?? "—"}\n` +
+      `• फोन: ${d.phone ?? "—"}\n` +
+      `• फसल: ${d.crop}\n` +
+      `• क्षेत्र: ${d.area_acres} एकड़\n` +
+      `• तारीख: ${d.scheduled_date}\n` +
+      `• गाँव: ${d.village}\n` +
+      `• स्प्रे: ${d.spray_type}\n\nबुक करने के लिए *पुष्टि करें* दबाएँ।`,
+    confirmed: (n, total) =>
+      `✅ *बुकिंग पक्की!*\nजॉब: \`${n}\`\nअनुमानित कुल: ₹${total}\n\nहमारी ऑप्स टीम क्रू भेजेगी और विज़िट से पहले आपको कॉल करेगी।`,
+    wishlisted: (n) =>
+      `⏳ उस दिन सभी स्लॉट भरे हैं। आप वेटलिस्ट पर हैं (जॉब \`${n}\`)। स्लॉट खाली होते ही आपको बताएँगे।`,
+    compFail: (n) =>
+      `⚠️ बुकिंग *${n}* की मैनुअल समीक्षा करनी होगी — आमतौर पर कंप्लायंस की वजह से। हमारी टीम आपको जल्द कॉल करेगी।`,
+    cancelled: "रद्द कर दिया। नई स्प्रे बुक करने के लिए /start भेजें।",
+    notNumber: "कृपया एक संख्या भेजें — जैसे 12 एकड़ के लिए `12`।",
+    notValidName: "कृपया अपना पूरा नाम भेजें (कम से कम 2 अक्षर)।",
+    notValidPhone: "कृपया सही 10-अंकीय भारतीय मोबाइल नंबर भेजें — जैसे `9876543210`।",
+    acceptBtn: "✅ स्वीकार करें",
+    confirmBtn: "✅ पुष्टि करें",
+    cancelBtn: "❌ रद्द करें",
+    todayLabel: "आज",
+    tomorrowLabel: "कल",
+    fieldName: "नाम",
+    fieldPhone: "फोन",
+    fieldCrop: "फसल",
+    fieldArea: "क्षेत्र",
+    fieldDate: "तारीख",
+    fieldVillage: "गाँव",
+    fieldSpray: "स्प्रे",
+    acres: "एकड़",
+  },
+  mr: {
+    askLanguage: "तुम्हाला कोणत्या भाषेत बोलायचं आहे?",
+    welcome: (n) =>
+      `🌾 नमस्कार ${n}! मी *सह्याद्री अ‍ॅग्री ड्रोन्स*चा AgroSpray बुकिंग बॉट आहे.\n\nएक मिनिटात तुमच्या शेतासाठी ड्रोन फवारणी बुक करा.`,
+    consent:
+      "सुरू करण्यापूर्वी: आम्ही तुमचं नाव, फोन, स्थान आणि बुकिंगची माहिती DGCA + DPDP नियमांनुसार सुरक्षित ठेवू. डेटा भारतातच राहील.\n\nपुढे जाण्यासाठी *मान्य* दाबा.",
+    consentAccepted: "धन्यवाद! चला सुरू करूया.",
+    hiAgain: (n) => `पुन्हा स्वागत, ${n}! 👋 तुमची पुढची फवारणी बुक करूया.`,
+    askName: "तुमचं *पूर्ण नाव* काय आहे? (आमचा पायलट संपर्क करण्यासाठी)",
+    askPhone:
+      "तुमच्याशी कोणत्या *फोन नंबर*वर संपर्क साधावा?\n(10-अंकी भारतीय मोबाइल, जसे `9876543210`)",
+    askCrop: "कोणतं पीक आहे?",
+    askArea: "किती *एकर* मध्ये फवारणी करायची?\n(फक्त संख्या लिहा — जसे `12`)",
+    askDate: "कोणता दिवस सोयीचा?",
+    askVillage: "शेत कोणत्या गावात आहे?",
+    askSprayType: "कोणती फवारणी?",
+    askConfirm: (d) =>
+      `*कृपया पुष्टी करा:*\n` +
+      `• नाव: ${d.name ?? "—"}\n` +
+      `• फोन: ${d.phone ?? "—"}\n` +
+      `• पीक: ${d.crop}\n` +
+      `• क्षेत्र: ${d.area_acres} एकर\n` +
+      `• तारीख: ${d.scheduled_date}\n` +
+      `• गाव: ${d.village}\n` +
+      `• फवारणी: ${d.spray_type}\n\nबुक करण्यासाठी *पुष्टी* दाबा.`,
+    confirmed: (n, total) =>
+      `✅ *बुकिंग पक्की!*\nजॉब: \`${n}\`\nअंदाजे एकूण: ₹${total}\n\nआमची ऑप्स टीम क्रू पाठवेल आणि भेटीपूर्वी तुम्हाला कॉल करेल.`,
+    wishlisted: (n) =>
+      `⏳ त्या दिवशी सर्व स्लॉट्स भरलेले आहेत. तुम्ही वेटलिस्टवर आहात (जॉब \`${n}\`). स्लॉट रिकामा होताच आम्ही कळवू.`,
+    compFail: (n) =>
+      `⚠️ बुकिंग *${n}* ची मॅन्युअल तपासणी करावी लागेल — सहसा कंप्लायन्ससाठी. आमची टीम तुम्हाला लवकरच कॉल करेल.`,
+    cancelled: "रद्द. नवीन फवारणी बुक करण्यासाठी /start पाठवा.",
+    notNumber: "कृपया संख्या पाठवा — जसे 12 एकरसाठी `12`.",
+    notValidName: "कृपया तुमचं पूर्ण नाव पाठवा (किमान 2 अक्षरे).",
+    notValidPhone: "कृपया योग्य 10-अंकी भारतीय मोबाइल नंबर पाठवा — जसे `9876543210`.",
+    acceptBtn: "✅ मान्य",
+    confirmBtn: "✅ पुष्टी",
+    cancelBtn: "❌ रद्द",
+    todayLabel: "आज",
+    tomorrowLabel: "उद्या",
+    fieldName: "नाव",
+    fieldPhone: "फोन",
+    fieldCrop: "पीक",
+    fieldArea: "क्षेत्र",
+    fieldDate: "तारीख",
+    fieldVillage: "गाव",
+    fieldSpray: "फवारणी",
+    acres: "एकर",
+  },
+};
+
+const t = (lang: Lang | string | null | undefined): Strings => {
+  const l = (lang && LANGS.includes(lang as Lang) ? (lang as Lang) : "en");
+  return STRINGS[l];
+};
+
+// ────────────────────────────────────────────────────────────────
+// Localized button labels for crops + spray types
+// ────────────────────────────────────────────────────────────────
+const CROPS: Array<{ id: string; en: string; hi: string; mr: string }> = [
+  { id: "cotton",    en: "Cotton",    hi: "कपास",   mr: "कापूस" },
+  { id: "wheat",     en: "Wheat",     hi: "गेहूं",   mr: "गहू" },
+  { id: "soybean",   en: "Soybean",   hi: "सोयाबीन", mr: "सोयाबीन" },
+  { id: "paddy",     en: "Paddy",     hi: "धान",    mr: "भात" },
+  { id: "maize",     en: "Maize",     hi: "मक्का",  mr: "मका" },
+  { id: "sugarcane", en: "Sugarcane", hi: "गन्ना",  mr: "ऊस" },
+  { id: "chilli",    en: "Chilli",    hi: "मिर्च",  mr: "मिरची" },
+  { id: "tomato",    en: "Tomato",    hi: "टमाटर",  mr: "टोमॅटो" },
+];
+
+const SPRAYS: Array<{ id: string; en: string; hi: string; mr: string }> = [
+  { id: "insecticide", en: "Insecticide", hi: "कीटनाशक",       mr: "कीटकनाशक" },
+  { id: "herbicide",   en: "Herbicide",   hi: "खरपतवारनाशक",  mr: "तणनाशक" },
+  { id: "fungicide",   en: "Fungicide",   hi: "कवकनाशी",       mr: "बुरशीनाशक" },
+  { id: "nutrient",    en: "Nutrient",    hi: "पोषक तत्व",     mr: "पोषक तत्त्व" },
+];
+
+const CROP_IDS = new Set(CROPS.map((c) => c.id));
+const SPRAY_IDS = new Set(SPRAYS.map((s) => s.id));
+
 const NAME_RE = /[A-Za-zऀ-ॿ]{2,}/;
 const PHONE_RE = /^[6-9]\d{9}$/;
 function normalisePhone(raw: string): string | null {
   const digits = raw.replace(/\D/g, "");
-  // accept 10-digit Indian, 11-digit (starts with 0), 12-digit (starts with 91)
   if (PHONE_RE.test(digits)) return digits;
   if (digits.length === 11 && digits.startsWith("0") && PHONE_RE.test(digits.slice(1))) return digits.slice(1);
   if (digits.length === 12 && digits.startsWith("91") && PHONE_RE.test(digits.slice(2))) return digits.slice(2);
   return null;
 }
-
-const CROPS = ["cotton", "wheat", "soybean", "paddy", "maize", "sugarcane", "chilli", "tomato"];
-const SPRAY_TYPES = ["insecticide", "herbicide", "fungicide", "nutrient"];
 
 // ────────────────────────────────────────────────────────────────
 // Telegram helpers
@@ -104,46 +283,80 @@ async function tg(method: string, token: string, body: Record<string, unknown>) 
 
 function inlineKeyboard(rows: { text: string; data: string }[][]) {
   return {
-    inline_keyboard: rows.map((row) =>
-      row.map((b) => ({ text: b.text, callback_data: b.data })),
-    ),
+    inline_keyboard: rows.map((row) => row.map((b) => ({ text: b.text, callback_data: b.data }))),
   };
 }
 
-function buttonGrid(items: string[], prefix: string, perRow = 2) {
+function langButtons() {
+  return inlineKeyboard(
+    LANGS.map((l) => [{ text: LANG_LABEL[l], data: `lang:${l}` }]),
+  );
+}
+
+function cropButtons(lang: Lang, perRow = 2) {
   const rows: { text: string; data: string }[][] = [];
-  for (let i = 0; i < items.length; i += perRow) {
+  for (let i = 0; i < CROPS.length; i += perRow) {
     rows.push(
-      items.slice(i, i + perRow).map((v) => ({
-        text: v[0].toUpperCase() + v.slice(1),
-        data: `${prefix}:${v}`,
+      CROPS.slice(i, i + perRow).map((c) => ({
+        text: c[lang],
+        data: `crop:${c.id}`,
       })),
     );
   }
   return inlineKeyboard(rows);
 }
 
-function dateButtons() {
+function sprayButtons(lang: Lang, perRow = 2) {
+  const rows: { text: string; data: string }[][] = [];
+  for (let i = 0; i < SPRAYS.length; i += perRow) {
+    rows.push(
+      SPRAYS.slice(i, i + perRow).map((s) => ({
+        text: s[lang],
+        data: `spray:${s.id}`,
+      })),
+    );
+  }
+  return inlineKeyboard(rows);
+}
+
+function dateButtons(lang: Lang) {
+  const s = t(lang);
   const out: { text: string; data: string }[][] = [];
   const today = new Date();
   for (let day = 0; day < 7; day++) {
     const d = new Date(today.getTime() + day * 86400e3);
     const iso = d.toISOString().slice(0, 10);
     const label =
-      day === 0 ? "Today" : day === 1 ? "Tomorrow" : d.toDateString().slice(0, 10);
+      day === 0 ? s.todayLabel : day === 1 ? s.tomorrowLabel : d.toDateString().slice(0, 10);
     out.push([{ text: label, data: `date:${iso}` }]);
   }
   return inlineKeyboard(out);
 }
 
+function consentButtons(lang: Lang) {
+  return inlineKeyboard([[{ text: t(lang).acceptBtn, data: "consent:accept" }]]);
+}
+
+function confirmButtons(lang: Lang) {
+  return inlineKeyboard([
+    [
+      { text: t(lang).confirmBtn, data: "confirm:yes" },
+      { text: t(lang).cancelBtn, data: "confirm:no" },
+    ],
+  ]);
+}
+
+// Map internal id (en) → localized label for the confirm summary
+function localizedLabel(kind: "crop" | "spray", id: string | undefined, lang: Lang): string {
+  if (!id) return "—";
+  if (kind === "crop") return CROPS.find((c) => c.id === id)?.[lang] ?? id;
+  return SPRAYS.find((s) => s.id === id)?.[lang] ?? id;
+}
+
 // ────────────────────────────────────────────────────────────────
-// DB helpers (service role, RLS bypassed)
+// DB helpers
 // ────────────────────────────────────────────────────────────────
-async function getTenantToken(): Promise<{
-  id: string;
-  name: string;
-  token: string | null;
-}> {
+async function getTenantToken() {
   const { data } = await supa
     .from("tenants")
     .select("id, name, telegram_bot_token")
@@ -152,22 +365,11 @@ async function getTenantToken(): Promise<{
   return {
     id: data?.id ?? SEED_TENANT_ID,
     name: data?.name ?? "AgroSpray",
-    token: data?.telegram_bot_token ?? null,
+    token: (data?.telegram_bot_token as string | null) ?? null,
   };
 }
 
-async function logMessage(row: {
-  tenant_id: string;
-  direction: "in" | "out";
-  chat_id: string;
-  user_id?: string;
-  username?: string;
-  message_id?: string;
-  body?: string;
-  payload?: unknown;
-  state?: string;
-  error?: string;
-}) {
+async function logMessage(row: Record<string, unknown>) {
   await supa.from("telegram_messages").insert(row);
 }
 
@@ -178,7 +380,7 @@ async function getOrCreateSession(tenantId: string, chatId: string, userId: stri
     .eq("tenant_id", tenantId)
     .eq("telegram_chat_id", chatId)
     .maybeSingle();
-  if (existing) return existing;
+  if (existing) return existing as Record<string, any>;
   const { data: created } = await supa
     .from("farmer_sessions")
     .insert({
@@ -191,7 +393,7 @@ async function getOrCreateSession(tenantId: string, chatId: string, userId: stri
     })
     .select("*")
     .single();
-  return created!;
+  return created as Record<string, any>;
 }
 
 async function setSession(id: string, patch: Record<string, unknown>) {
@@ -201,9 +403,6 @@ async function setSession(id: string, patch: Record<string, unknown>) {
     .eq("id", id);
 }
 
-// ────────────────────────────────────────────────────────────────
-// Send + log
-// ────────────────────────────────────────────────────────────────
 async function reply(token: string, tenantId: string, chatId: string, text: string, opts?: { reply_markup?: unknown }) {
   const result = await tg("sendMessage", token, {
     chat_id: chatId,
@@ -236,8 +435,9 @@ async function handleInput(
   firstName: string,
 ) {
   const session = await getOrCreateSession(tenantId, chatId, userId, username);
+  const lang: Lang = (session.language as Lang) ?? "en";
+  const s = t(lang);
 
-  // Always acknowledge a callback so the spinner stops
   if (callbackQueryId) {
     await tg("answerCallbackQuery", token, { callback_query_id: callbackQueryId });
   }
@@ -248,164 +448,175 @@ async function handleInput(
   // Universal commands
   if (lower === "/cancel") {
     await setSession(session.id, { state: "idle", draft: {} });
-    return reply(token, tenantId, chatId, T.cancelled);
+    return reply(token, tenantId, chatId, s.cancelled);
   }
+
+  // /start always restarts the journey, but reuses stored language + name
+  // if we have them on file.
   if (lower === "/start") {
     let knownName: string | null = null;
+    let storedLang: Lang | null = null;
     if (session.farmer_id) {
       const { data: f } = await supa
         .from("farmers")
-        .select("name")
+        .select("name, default_language")
         .eq("id", session.farmer_id)
         .maybeSingle();
       if (f?.name && f.name !== "Telegram user") knownName = f.name as string;
+      if (f?.default_language && LANGS.includes(f.default_language as Lang)) {
+        storedLang = f.default_language as Lang;
+      }
     }
+
+    // First-time user (no consent on file) → always ask for language first.
+    if (!session.consent_at) {
+      await setSession(session.id, { state: "awaiting_language", draft: {} });
+      return reply(token, tenantId, chatId, STRINGS.en.askLanguage, { reply_markup: langButtons() });
+    }
+
+    // Returning user — reuse stored language from farmer profile or current session.
+    const effectiveLang: Lang = storedLang ?? lang;
+    if (storedLang && storedLang !== lang) {
+      await setSession(session.id, { language: storedLang });
+    }
+    const eff = t(effectiveLang);
 
     if (!session.consent_at) {
       await setSession(session.id, { state: "awaiting_consent", draft: {} });
-      await reply(token, tenantId, chatId, T.welcome(firstName));
-      return reply(token, tenantId, chatId, T.consent, {
-        reply_markup: inlineKeyboard([[{ text: "✅ Accept", data: "consent:accept" }]]),
-      });
+      await reply(token, tenantId, chatId, eff.welcome(firstName));
+      return reply(token, tenantId, chatId, eff.consent, { reply_markup: consentButtons(effectiveLang) });
     }
 
     if (!knownName) {
-      // Returning user but no usable name on file — ask again so the admin
-      // sees a real name on the booking.
       await setSession(session.id, { state: "awaiting_name", draft: {} });
-      await reply(token, tenantId, chatId, T.welcome(firstName));
-      return reply(token, tenantId, chatId, T.askName);
+      await reply(token, tenantId, chatId, eff.welcome(firstName));
+      return reply(token, tenantId, chatId, eff.askName);
     }
 
     await setSession(session.id, { state: "awaiting_crop", draft: { name: knownName } });
-    await reply(token, tenantId, chatId, T.hiAgain(knownName));
-    return reply(token, tenantId, chatId, T.askCrop, {
-      reply_markup: buttonGrid(CROPS, "crop"),
-    });
+    await reply(token, tenantId, chatId, eff.hiAgain(knownName));
+    return reply(token, tenantId, chatId, eff.askCrop, { reply_markup: cropButtons(effectiveLang) });
   }
 
-  const draft: Draft = session.draft ?? {};
+  const draft: Draft = (session.draft as Draft) ?? {};
 
   switch (session.state) {
+    case "awaiting_language": {
+      let picked: Lang | null = null;
+      if (callbackData?.startsWith("lang:")) {
+        const v = callbackData.slice(5);
+        if (LANGS.includes(v as Lang)) picked = v as Lang;
+      }
+      if (!picked) {
+        return reply(token, tenantId, chatId, STRINGS.en.askLanguage, { reply_markup: langButtons() });
+      }
+      await setSession(session.id, { state: "awaiting_consent", language: picked });
+      const pickedStrings = t(picked);
+      await reply(token, tenantId, chatId, pickedStrings.welcome(firstName));
+      return reply(token, tenantId, chatId, pickedStrings.consent, { reply_markup: consentButtons(picked) });
+    }
     case "awaiting_consent": {
       if (callbackData === "consent:accept" || lower === "accept") {
         await setSession(session.id, {
           state: "awaiting_name",
           consent_at: new Date().toISOString(),
         });
-        await reply(token, tenantId, chatId, T.consentAccepted);
-        return reply(token, tenantId, chatId, T.askName);
+        await reply(token, tenantId, chatId, s.consentAccepted);
+        return reply(token, tenantId, chatId, s.askName);
       }
-      return reply(token, tenantId, chatId, T.consent, {
-        reply_markup: inlineKeyboard([[{ text: "✅ Accept", data: "consent:accept" }]]),
-      });
+      return reply(token, tenantId, chatId, s.consent, { reply_markup: consentButtons(lang) });
     }
     case "awaiting_name": {
       const candidate = (text ?? "").trim();
       if (!candidate || !NAME_RE.test(candidate)) {
-        return reply(token, tenantId, chatId, T.notValidName);
+        return reply(token, tenantId, chatId, s.notValidName);
       }
       await setSession(session.id, {
         state: "awaiting_phone",
         draft: { ...draft, name: candidate },
       });
-      return reply(token, tenantId, chatId, T.askPhone);
+      return reply(token, tenantId, chatId, s.askPhone);
     }
     case "awaiting_phone": {
       const phone = normalisePhone(text ?? "");
       if (!phone) {
-        return reply(token, tenantId, chatId, T.notValidPhone);
+        return reply(token, tenantId, chatId, s.notValidPhone);
       }
       await setSession(session.id, {
         state: "awaiting_crop",
         draft: { ...draft, phone },
       });
-      return reply(token, tenantId, chatId, T.askCrop, {
-        reply_markup: buttonGrid(CROPS, "crop"),
-      });
+      return reply(token, tenantId, chatId, s.askCrop, { reply_markup: cropButtons(lang) });
     }
     case "awaiting_crop": {
       let crop: string | null = null;
       if (callbackData?.startsWith("crop:")) crop = callbackData.slice(5);
-      else if (CROPS.includes(lower)) crop = lower;
+      else if (CROP_IDS.has(lower)) crop = lower;
       if (!crop) {
-        return reply(token, tenantId, chatId, T.askCrop, {
-          reply_markup: buttonGrid(CROPS, "crop"),
-        });
+        return reply(token, tenantId, chatId, s.askCrop, { reply_markup: cropButtons(lang) });
       }
       await setSession(session.id, {
         state: "awaiting_area",
         draft: { ...draft, crop },
       });
-      return reply(token, tenantId, chatId, T.askArea);
+      return reply(token, tenantId, chatId, s.askArea);
     }
     case "awaiting_area": {
       const n = Number(text);
       if (!Number.isFinite(n) || n <= 0) {
-        return reply(token, tenantId, chatId, T.notNumber);
+        return reply(token, tenantId, chatId, s.notNumber);
       }
       await setSession(session.id, {
         state: "awaiting_date",
         draft: { ...draft, area_acres: n },
       });
-      return reply(token, tenantId, chatId, T.askDate, {
-        reply_markup: dateButtons(),
-      });
+      return reply(token, tenantId, chatId, s.askDate, { reply_markup: dateButtons(lang) });
     }
     case "awaiting_date": {
       let iso: string | null = null;
       if (callbackData?.startsWith("date:")) iso = callbackData.slice(5);
       else if (/^\d{4}-\d{2}-\d{2}$/.test(input)) iso = input;
       if (!iso) {
-        return reply(token, tenantId, chatId, T.askDate, {
-          reply_markup: dateButtons(),
-        });
+        return reply(token, tenantId, chatId, s.askDate, { reply_markup: dateButtons(lang) });
       }
       await setSession(session.id, {
         state: "awaiting_village",
         draft: { ...draft, scheduled_date: iso },
       });
-      return reply(token, tenantId, chatId, T.askVillage);
+      return reply(token, tenantId, chatId, s.askVillage);
     }
     case "awaiting_village": {
       if (!text || text.length < 2) {
-        return reply(token, tenantId, chatId, T.askVillage);
+        return reply(token, tenantId, chatId, s.askVillage);
       }
       await setSession(session.id, {
         state: "awaiting_spray_type",
         draft: { ...draft, village: text },
       });
-      return reply(token, tenantId, chatId, T.askSprayType, {
-        reply_markup: buttonGrid(SPRAY_TYPES, "spray"),
-      });
+      return reply(token, tenantId, chatId, s.askSprayType, { reply_markup: sprayButtons(lang) });
     }
     case "awaiting_spray_type": {
       let spray: string | null = null;
       if (callbackData?.startsWith("spray:")) spray = callbackData.slice(6);
-      else if (SPRAY_TYPES.includes(lower)) spray = lower;
+      else if (SPRAY_IDS.has(lower)) spray = lower;
       if (!spray) {
-        return reply(token, tenantId, chatId, T.askSprayType, {
-          reply_markup: buttonGrid(SPRAY_TYPES, "spray"),
-        });
+        return reply(token, tenantId, chatId, s.askSprayType, { reply_markup: sprayButtons(lang) });
       }
       const nextDraft = { ...draft, spray_type: spray };
-      await setSession(session.id, {
-        state: "awaiting_confirm",
-        draft: nextDraft,
-      });
-      return reply(token, tenantId, chatId, T.askConfirm(nextDraft), {
-        reply_markup: inlineKeyboard([
-          [
-            { text: "✅ Confirm", data: "confirm:yes" },
-            { text: "❌ Cancel", data: "confirm:no" },
-          ],
-        ]),
+      await setSession(session.id, { state: "awaiting_confirm", draft: nextDraft });
+      const displayDraft: Draft = {
+        ...nextDraft,
+        crop: localizedLabel("crop", nextDraft.crop, lang),
+        spray_type: localizedLabel("spray", nextDraft.spray_type, lang),
+      };
+      return reply(token, tenantId, chatId, s.askConfirm(displayDraft), {
+        reply_markup: confirmButtons(lang),
       });
     }
     case "awaiting_confirm": {
       if (callbackData === "confirm:no" || lower === "cancel") {
         await setSession(session.id, { state: "idle", draft: {} });
-        return reply(token, tenantId, chatId, T.cancelled);
+        return reply(token, tenantId, chatId, s.cancelled);
       }
       if (callbackData === "confirm:yes" || lower === "confirm") {
         const { data, error } = await supa.rpc("tg_finalize_booking", {
@@ -414,47 +625,30 @@ async function handleInput(
         });
         if (error) {
           console.error("finalize error", error);
-          return reply(
-            token,
-            tenantId,
-            chatId,
-            `❌ Couldn't book: ${error.message}. Send /start to try again.`,
-          );
+          return reply(token, tenantId, chatId, `❌ ${error.message}`);
         }
-        const r = data as {
-          status: string;
-          job_number?: string;
-          total?: string;
-        };
+        const r = data as { status: string; job_number?: string; total?: string };
         if (r.status === "confirmed") {
-          return reply(
-            token,
-            tenantId,
-            chatId,
-            T.confirmed(r.job_number ?? "AGR-?", r.total ?? "0"),
-          );
+          return reply(token, tenantId, chatId, s.confirmed(r.job_number ?? "AGR-?", r.total ?? "0"));
         }
         if (r.status === "wishlisted") {
-          return reply(token, tenantId, chatId, T.wishlisted(r.job_number ?? "AGR-?"));
+          return reply(token, tenantId, chatId, s.wishlisted(r.job_number ?? "AGR-?"));
         }
-        return reply(token, tenantId, chatId, T.compFail(r.job_number ?? "AGR-?"));
+        return reply(token, tenantId, chatId, s.compFail(r.job_number ?? "AGR-?"));
       }
-      return reply(token, tenantId, chatId, T.askConfirm(draft), {
-        reply_markup: inlineKeyboard([
-          [
-            { text: "✅ Confirm", data: "confirm:yes" },
-            { text: "❌ Cancel", data: "confirm:no" },
-          ],
-        ]),
+      const displayDraft: Draft = {
+        ...draft,
+        crop: localizedLabel("crop", draft.crop, lang),
+        spray_type: localizedLabel("spray", draft.spray_type, lang),
+      };
+      return reply(token, tenantId, chatId, s.askConfirm(displayDraft), {
+        reply_markup: confirmButtons(lang),
       });
     }
     default:
-      // idle / unknown → bounce to /start
-      await setSession(session.id, { state: "awaiting_consent" });
-      await reply(token, tenantId, chatId, T.welcome(firstName));
-      return reply(token, tenantId, chatId, T.consent, {
-        reply_markup: inlineKeyboard([[{ text: "✅ Accept", data: "consent:accept" }]]),
-      });
+      // idle / unknown → restart from language
+      await setSession(session.id, { state: "awaiting_language", draft: {} });
+      return reply(token, tenantId, chatId, STRINGS.en.askLanguage, { reply_markup: langButtons() });
   }
 }
 
@@ -463,30 +657,10 @@ async function handleInput(
 // ────────────────────────────────────────────────────────────────
 // @ts-expect-error  Deno global
 Deno.serve(async (req: Request) => {
-  if (req.method === "GET") {
-    return new Response("ok", { status: 200 });
-  }
-  if (req.method !== "POST") {
-    return new Response("method not allowed", { status: 405 });
-  }
+  if (req.method === "GET") return new Response("ok", { status: 200 });
+  if (req.method !== "POST") return new Response("method not allowed", { status: 405 });
 
-  const update = await req.json().catch(() => null) as
-    | {
-        message?: {
-          message_id: number;
-          from: { id: number; username?: string; first_name?: string };
-          chat: { id: number };
-          text?: string;
-        };
-        callback_query?: {
-          id: string;
-          from: { id: number; username?: string; first_name?: string };
-          message?: { chat: { id: number } };
-          data?: string;
-        };
-      }
-    | null;
-
+  const update = (await req.json().catch(() => null)) as any;
   if (!update) return new Response("bad request", { status: 400 });
 
   const tenant = await getTenantToken();
