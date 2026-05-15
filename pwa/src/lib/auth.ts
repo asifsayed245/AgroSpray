@@ -80,19 +80,24 @@ export const useAuth = create<AuthState>((set, get) => ({
   },
 
   refresh: async () => {
-    const { data } = await supabase.auth.getSession();
-    const session = data.session ?? null;
-    const user = session?.user ?? null;
-    let profile: Profile | null = null;
-    if (user) {
-      const { data: p } = await supabase
-        .from("profiles")
-        .select("id, tenant_id, role, full_name, phone, email")
-        .eq("id", user.id)
-        .maybeSingle();
-      profile = (p as Profile | null) ?? null;
+    try {
+      const { data } = await supabase.auth.getSession();
+      const session = data.session ?? null;
+      const user = session?.user ?? null;
+      let profile: Profile | null = null;
+      if (user) {
+        const { data: p } = await supabase
+          .from("profiles")
+          .select("id, tenant_id, role, full_name, phone, email")
+          .eq("id", user.id)
+          .maybeSingle();
+        profile = (p as Profile | null) ?? null;
+      }
+      set({ session, user, profile, hydrated: true });
+    } catch (e) {
+      console.warn("[auth] refresh failed:", e);
+      set({ session: null, user: null, profile: null, hydrated: true });
     }
-    set({ session, user, profile, hydrated: true });
   },
 }));
 
@@ -103,5 +108,16 @@ export function initAuthSubscription() {
     if (session?.user) await useAuth.getState().refresh();
     else useAuth.setState({ profile: null, hydrated: true });
   });
-  void useAuth.getState().refresh();
+  // Safety: if refresh hangs for any reason (network, stuck CDN, blocked SDK),
+  // unblock the UI after 6s so the user lands on /login and can still sign in.
+  const watchdog = setTimeout(() => {
+    if (!useAuth.getState().hydrated) {
+      console.warn("[auth] hydration watchdog fired after 6s — forcing logged-out state");
+      useAuth.setState({ hydrated: true, session: null, user: null, profile: null });
+    }
+  }, 6000);
+  void useAuth
+    .getState()
+    .refresh()
+    .finally(() => clearTimeout(watchdog));
 }
