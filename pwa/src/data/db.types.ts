@@ -715,6 +715,41 @@ export type Database = {
           },
         ]
       }
+      job_windows: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          job_id: string
+          time_end: string
+          time_start: string
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          id?: string
+          job_id: string
+          time_end: string
+          time_start: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          job_id?: string
+          time_end?: string
+          time_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_windows_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           area: number
@@ -1767,6 +1802,14 @@ export type Database = {
         }
         Returns: Json
       }
+      check_windows_conflict: {
+        Args: {
+          p_exclude_job_id?: string
+          p_tenant_id: string
+          p_windows: Json
+        }
+        Returns: Json
+      }
       close_farmer_query: {
         Args: { p_query_id: string }
         Returns: {
@@ -1876,12 +1919,7 @@ export type Database = {
         }
       }
       confirm_inquiry: {
-        Args: {
-          p_date_end?: string
-          p_job_id: string
-          p_time_end: string
-          p_time_start: string
-        }
+        Args: { p_job_id: string; p_windows: Json }
         Returns: {
           area: number
           area_acres: number
@@ -2264,6 +2302,56 @@ export type Database = {
               isSetofReturn: false
             }
           }
+      reschedule_job_windows: {
+        Args: {
+          p_job_id: string
+          p_new_date: string
+          p_new_date_end: string
+          p_reason: string
+          p_windows: Json
+        }
+        Returns: {
+          area: number
+          area_acres: number
+          area_unit: Database["public"]["Enums"]["area_unit"]
+          assigned_drone_id: string | null
+          assigned_pilot_id: string | null
+          cancel_reason: string | null
+          created_at: string
+          crop: string
+          farmer_id: string
+          id: string
+          location_lat: number | null
+          location_lng: number | null
+          location_polygon: Json | null
+          number: string
+          override_reason: string | null
+          pesticide_brand: string | null
+          pesticide_name: string | null
+          pricing_snapshot: Json | null
+          reschedule_count: number
+          scheduled_date: string
+          scheduled_date_end: string | null
+          scheduled_time_end: string | null
+          scheduled_time_start: string | null
+          spray_type: string | null
+          state: Database["public"]["Enums"]["job_state"]
+          state_history: Json
+          tenant_id: string
+          updated_at: string
+          version: number
+          village: string | null
+          weather_evaluated_at: string | null
+          weather_last_notified_safety: string | null
+          weather_safety: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       reserve_date_range: {
         Args: { p_date_end: string; p_date_start: string; p_tenant_id: string }
         Returns: boolean
@@ -2621,3 +2709,4 @@ export const Constants = {
     },
   },
 } as const
+

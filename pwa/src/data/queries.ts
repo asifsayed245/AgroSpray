@@ -2,10 +2,12 @@
 // to evolve schema/query shape when the DB changes.
 
 import { supabase } from "@/lib/supabase";
-import type { Database } from "@/data/db.types";
+import type { Database, Json } from "@/data/db.types";
 
 type JobState = Database["public"]["Enums"]["job_state"];
 type AuditSource = Database["public"]["Enums"]["audit_source"];
+
+export type JobWindowSpec = { date: string; time_start: string; time_end: string };
 
 export type JobRow = {
   id: string;
@@ -255,6 +257,23 @@ export async function rescheduleJobWithWindow(
   });
 }
 
+// Per-day reschedule — passes an array of {date, time_start, time_end}.
+export async function rescheduleJobWithWindows(
+  jobId: string,
+  newDate: string,
+  newDateEnd: string,
+  windows: JobWindowSpec[],
+  reason: string,
+) {
+  return supabase.rpc("reschedule_job_windows", {
+    p_job_id: jobId,
+    p_new_date: newDate,
+    p_new_date_end: newDateEnd,
+    p_windows: windows as unknown as Json,
+    p_reason: reason,
+  });
+}
+
 export async function generateInvoice(jobId: string) {
   return supabase.rpc("generate_invoice", { p_job_id: jobId });
 }
@@ -471,18 +490,62 @@ export async function checkWindowConflict(
     .returns<WindowConflict>();
 }
 
-export async function confirmInquiry(
-  jobId: string,
-  timeStart: string,
-  timeEnd: string,
-  dateEnd?: string | null,
-) {
+export async function confirmInquiry(jobId: string, windows: JobWindowSpec[]) {
   return supabase.rpc("confirm_inquiry", {
     p_job_id: jobId,
-    p_time_start: timeStart,
-    p_time_end: timeEnd,
-    p_date_end: (dateEnd ?? null) as unknown as string,
+    p_windows: windows as unknown as Json,
   });
+}
+
+export type WindowsConflict = {
+  ok: boolean;
+  per_day: Array<{ date: string; result: WindowConflict }>;
+};
+
+export async function checkWindowsConflict(
+  tenantId: string,
+  windows: JobWindowSpec[],
+  excludeJobId?: string,
+) {
+  return supabase
+    .rpc("check_windows_conflict", {
+      p_tenant_id: tenantId,
+      p_windows: windows as unknown as Json,
+      p_exclude_job_id: (excludeJobId ?? null) as unknown as string,
+    })
+    .returns<WindowsConflict>();
+}
+
+export type JobWindow = {
+  id: string;
+  job_id: string;
+  date: string;
+  time_start: string;
+  time_end: string;
+};
+
+export async function listJobWindows(jobId: string) {
+  return supabase
+    .from("job_windows")
+    .select("id, job_id, date, time_start, time_end")
+    .eq("job_id", jobId)
+    .order("date")
+    .returns<JobWindow[]>();
+}
+
+export async function upsertJobWindows(jobId: string, windows: JobWindowSpec[]) {
+  // Replace existing windows for a job. Used by NewJob when an admin creates
+  // a windowed booking before submitting for compliance.
+  await supabase.from("job_windows").delete().eq("job_id", jobId);
+  if (windows.length === 0) return { error: null };
+  return supabase.from("job_windows").insert(
+    windows.map((w) => ({
+      job_id: jobId,
+      date: w.date,
+      time_start: w.time_start,
+      time_end: w.time_end,
+    })),
+  );
 }
 
 export async function sendInquiryConfirmation(jobId: string) {

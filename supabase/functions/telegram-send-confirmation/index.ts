@@ -20,17 +20,40 @@ const cors = {
 };
 
 type Lang = "en" | "hi" | "mr";
+type Window = { date: string; time_start: string; time_end: string };
 
-function formatRange(dateStart: string, dateEnd: string | null, timeStart: string | null, timeEnd: string | null, lang: Lang) {
-  // Date side
-  const fmt = (iso: string) =>
-    new Date(iso + "T00:00:00").toLocaleDateString(
-      lang === "hi" ? "hi-IN" : lang === "mr" ? "mr-IN" : "en-IN",
-      { day: "numeric", month: "short" },
-    );
-  const dateLabel = !dateEnd || dateEnd === dateStart ? fmt(dateStart) : `${fmt(dateStart)} – ${fmt(dateEnd)}`;
-  if (!timeStart || !timeEnd) return dateLabel;
-  return `${dateLabel}, ${timeStart.slice(0, 5)} – ${timeEnd.slice(0, 5)}`;
+function fmtDate(iso: string, lang: Lang) {
+  return new Date(iso + "T00:00:00").toLocaleDateString(
+    lang === "hi" ? "hi-IN" : lang === "mr" ? "mr-IN" : "en-IN",
+    { day: "numeric", month: "short" },
+  );
+}
+
+// Build a localized when-string from a list of per-day windows.
+// Single day with time:        "20 May, 08:00 – 12:00"
+// Multi-day uniform window:    "20 – 22 May, 08:00 – 12:00"
+// Multi-day differing windows: "20 May 08:00 – 12:00; 21 May 14:00 – 18:00"
+// No windows (all-day):        "20 May" or "20 – 22 May"
+function formatWhen(
+  dateStart: string,
+  dateEnd: string | null,
+  windowsList: Window[],
+  lang: Lang,
+): string {
+  const dateLabel = !dateEnd || dateEnd === dateStart
+    ? fmtDate(dateStart, lang)
+    : `${fmtDate(dateStart, lang)} – ${fmtDate(dateEnd, lang)}`;
+  if (windowsList.length === 0) return dateLabel;
+  const first = windowsList[0];
+  const allSame = windowsList.every(
+    (w) => w.time_start === first.time_start && w.time_end === first.time_end,
+  );
+  if (allSame) {
+    return `${dateLabel}, ${first.time_start.slice(0, 5)} – ${first.time_end.slice(0, 5)}`;
+  }
+  return windowsList
+    .map((w) => `${fmtDate(w.date, lang)} ${w.time_start.slice(0, 5)} – ${w.time_end.slice(0, 5)}`)
+    .join("; ");
 }
 
 function buildMessage(args: {
@@ -105,6 +128,13 @@ Deno.serve(async (req: Request) => {
     .single();
   if (!job) return Response.json({ error: "job missing" }, { status: 404, headers: cors });
 
+  const { data: windowsRows } = await supa
+    .from("job_windows")
+    .select("date, time_start, time_end")
+    .eq("job_id", body.job_id)
+    .order("date");
+  const windowsList: Window[] = (windowsRows ?? []) as Window[];
+
   const { data: tenant } = await supa
     .from("tenants")
     .select("name, telegram_bot_token")
@@ -142,13 +172,7 @@ Deno.serve(async (req: Request) => {
     return Response.json({ ok: false, reason: "farmer has no telegram chat on file" }, { headers: cors });
   }
 
-  const when = formatRange(
-    job.scheduled_date,
-    job.scheduled_date_end,
-    job.scheduled_time_start,
-    job.scheduled_time_end,
-    lang,
-  );
+  const when = formatWhen(job.scheduled_date, job.scheduled_date_end, windowsList, lang);
   const total = (job.pricing_snapshot as { total?: number } | null)?.total ?? null;
   const text = buildMessage({
     lang,

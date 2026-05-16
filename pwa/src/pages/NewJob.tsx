@@ -9,7 +9,14 @@ import { IconTile } from "@/components/ui/icon-tile";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useSupabaseQuery } from "@/hooks/useSupabaseQuery";
-import { checkWindowConflict, listFarmers, submitJobForCompliance, type WindowConflict } from "@/data/queries";
+import {
+  checkWindowsConflict,
+  listFarmers,
+  submitJobForCompliance,
+  upsertJobWindows,
+  type JobWindowSpec,
+  type WindowsConflict,
+} from "@/data/queries";
 
 const STEPS = ["Customer", "Field", "Schedule", "Spray", "Confirm"] as const;
 
@@ -22,8 +29,7 @@ type FormState = {
   areaAcres: number;
   scheduledDate: string;
   scheduledDateEnd: string;
-  timeStart: string;
-  timeEnd: string;
+  windows: JobWindowSpec[]; // one entry per day in [scheduledDate, scheduledDateEnd]
   allDay: boolean;
   sprayType: string;
   pesticideName: string;
@@ -32,11 +38,39 @@ type FormState = {
 const CROPS = ["cotton", "wheat", "soybean", "sugarcane", "paddy", "maize", "tomato", "chilli"] as const;
 const SPRAY_TYPES = ["insecticide", "fungicide", "herbicide", "fertiliser"] as const;
 
+const DEFAULT_WINDOW = { time_start: "08:00", time_end: "12:00" } as const;
+
+function datesInRange(startISO: string, endISO: string): string[] {
+  const out: string[] = [];
+  const start = new Date(startISO + "T00:00:00");
+  const end = new Date(endISO + "T00:00:00");
+  if (end < start) return [startISO];
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
+}
+
+// Rebuild the per-day windows array when the date range changes. Preserves
+// any time picks the user already set for dates that remain in the range.
+function reconcileWindows(
+  start: string,
+  end: string,
+  existing: JobWindowSpec[],
+): JobWindowSpec[] {
+  const dates = datesInRange(start, end);
+  const byDate = new Map(existing.map((w) => [w.date, w]));
+  return dates.map((d) =>
+    byDate.get(d) ?? { date: d, time_start: DEFAULT_WINDOW.time_start, time_end: DEFAULT_WINDOW.time_end },
+  );
+}
+
 export default function NewJob() {
   const nav = useNavigate();
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const tomorrow = new Date(Date.now() + 86400e3).toISOString().slice(0, 10);
   const [form, setForm] = useState<FormState>({
     farmerId: null,
     farmerName: "",
@@ -44,28 +78,42 @@ export default function NewJob() {
     village: "",
     crop: "cotton",
     areaAcres: 5,
-    scheduledDate: new Date(Date.now() + 86400e3).toISOString().slice(0, 10),
-    scheduledDateEnd: new Date(Date.now() + 86400e3).toISOString().slice(0, 10),
-    timeStart: "08:00",
-    timeEnd: "12:00",
+    scheduledDate: tomorrow,
+    scheduledDateEnd: tomorrow,
+    windows: [{ date: tomorrow, time_start: DEFAULT_WINDOW.time_start, time_end: DEFAULT_WINDOW.time_end }],
     allDay: false,
     sprayType: "insecticide",
     pesticideName: "",
   });
-  const update = (p: Partial<FormState>) => setForm((f) => ({ ...f, ...p }));
+
+  const update = (p: Partial<FormState>) => {
+    setForm((f) => {
+      const next = { ...f, ...p };
+      // Reconcile windows whenever the range changes.
+      if (
+        p.scheduledDate !== undefined ||
+        p.scheduledDateEnd !== undefined
+      ) {
+        next.windows = reconcileWindows(next.scheduledDate, next.scheduledDateEnd, f.windows);
+      }
+      return next;
+    });
+  };
+
+  const setWindow = (date: string, patch: Partial<JobWindowSpec>) => {
+    setForm((f) => ({
+      ...f,
+      windows: f.windows.map((w) => (w.date === date ? { ...w, ...patch } : w)),
+    }));
+  };
 
   async function submit() {
     setBusy(true);
     setError(null);
     try {
-      // Get tenant from the current profile (RLS will scope writes).
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("tenant_id")
-        .single();
+      const { data: profile } = await supabase.from("profiles").select("tenant_id").single();
       if (!profile?.tenant_id) throw new Error("No tenant on profile — finish onboarding first.");
 
-      // Find or create farmer
       let farmerId = form.farmerId;
       if (!farmerId) {
         const { data: farmer, error: fErr } = await supabase
@@ -82,12 +130,14 @@ export default function NewJob() {
         farmerId = farmer.id;
       }
 
-      // Generate the job number server-side, then create the job.
       const { data: numberRow } = await supabase.rpc("generate_job_number", {
         p_tenant_id: profile.tenant_id,
         p_crop: form.crop,
         p_date: form.scheduledDate,
       });
+
+      const firstWin = !form.allDay ? form.windows[0] : null;
+      const multiDay = form.scheduledDateEnd && form.scheduledDateEnd !== form.scheduledDate;
 
       const { data: job, error: jErr } = await supabase
         .from("jobs")
@@ -99,12 +149,9 @@ export default function NewJob() {
           area: form.areaAcres,
           area_acres: form.areaAcres,
           scheduled_date: form.scheduledDate,
-          scheduled_date_end:
-            form.scheduledDateEnd && form.scheduledDateEnd !== form.scheduledDate
-              ? form.scheduledDateEnd
-              : null,
-          scheduled_time_start: form.allDay ? null : form.timeStart,
-          scheduled_time_end: form.allDay ? null : form.timeEnd,
+          scheduled_date_end: multiDay ? form.scheduledDateEnd : null,
+          scheduled_time_start: firstWin?.time_start ?? null,
+          scheduled_time_end: firstWin?.time_end ?? null,
           village: form.village,
           spray_type: form.sprayType,
           pesticide_name: form.pesticideName || null,
@@ -113,7 +160,12 @@ export default function NewJob() {
         .single();
       if (jErr) throw jErr;
 
-      // Run compliance / reserve slot.
+      // Insert per-day windows (unless all-day).
+      if (!form.allDay) {
+        const { error: wErr } = await upsertJobWindows(job.id, form.windows);
+        if (wErr) throw wErr;
+      }
+
       await submitJobForCompliance(job.id);
       nav(`/jobs/${job.id}`);
     } catch (e: unknown) {
@@ -135,45 +187,19 @@ export default function NewJob() {
           </Card>
         )}
 
-        {step === 0 && (
-          <StepCustomer
-            form={form}
-            update={update}
-            onNext={() => setStep(1)}
-          />
-        )}
-        {step === 1 && (
-          <StepField
-            form={form}
-            update={update}
-            onBack={() => setStep(0)}
-            onNext={() => setStep(2)}
-          />
-        )}
+        {step === 0 && <StepCustomer form={form} update={update} onNext={() => setStep(1)} />}
+        {step === 1 && <StepField form={form} update={update} onBack={() => setStep(0)} onNext={() => setStep(2)} />}
         {step === 2 && (
           <StepSchedule
             form={form}
             update={update}
+            setWindow={setWindow}
             onBack={() => setStep(1)}
             onNext={() => setStep(3)}
           />
         )}
-        {step === 3 && (
-          <StepSpray
-            form={form}
-            update={update}
-            onBack={() => setStep(2)}
-            onNext={() => setStep(4)}
-          />
-        )}
-        {step === 4 && (
-          <StepConfirm
-            form={form}
-            busy={busy}
-            onBack={() => setStep(3)}
-            onSubmit={submit}
-          />
-        )}
+        {step === 3 && <StepSpray form={form} update={update} onBack={() => setStep(2)} onNext={() => setStep(4)} />}
+        {step === 4 && <StepConfirm form={form} busy={busy} onBack={() => setStep(3)} onSubmit={submit} />}
       </div>
     </>
   );
@@ -346,11 +372,13 @@ function StepField({
 function StepSchedule({
   form,
   update,
+  setWindow,
   onBack,
   onNext,
 }: {
   form: FormState;
   update: (p: Partial<FormState>) => void;
+  setWindow: (date: string, patch: Partial<JobWindowSpec>) => void;
   onBack: () => void;
   onNext: () => void;
 }) {
@@ -398,7 +426,6 @@ function StepSchedule({
           value={form.scheduledDate}
           onChange={(e) => {
             const v = e.target.value;
-            // Keep end >= start
             update({
               scheduledDate: v,
               scheduledDateEnd: form.scheduledDateEnd < v ? v : form.scheduledDateEnd,
@@ -417,7 +444,9 @@ function StepSchedule({
 
       <div className="mt-3 rounded-2xl border border-ink-900/5 bg-canvas p-3">
         <div className="flex items-center justify-between">
-          <div className="text-xs font-semibold text-ink-900">Time window</div>
+          <div className="text-xs font-semibold text-ink-900">
+            Time {form.windows.length > 1 ? "windows (per day)" : "window"}
+          </div>
           <label className="flex items-center gap-1.5 text-[11px] text-ink-700">
             <input
               type="checkbox"
@@ -427,20 +456,39 @@ function StepSchedule({
             All day
           </label>
         </div>
+
         {!form.allDay && (
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            <Input
-              label="Start"
-              type="time"
-              value={form.timeStart}
-              onChange={(e) => update({ timeStart: e.target.value })}
-            />
-            <Input
-              label="End"
-              type="time"
-              value={form.timeEnd}
-              onChange={(e) => update({ timeEnd: e.target.value })}
-            />
+          <div className="mt-2 space-y-2">
+            {form.windows.map((w) => (
+              <div
+                key={w.date}
+                className="rounded-xl border border-ink-900/5 bg-white p-2"
+              >
+                {form.windows.length > 1 && (
+                  <div className="text-[11px] font-medium text-ink-700 mb-1.5">
+                    {new Date(w.date + "T00:00:00").toLocaleDateString("en-IN", {
+                      weekday: "short",
+                      day: "2-digit",
+                      month: "short",
+                    })}
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  <Input
+                    label="Start"
+                    type="time"
+                    value={w.time_start}
+                    onChange={(e) => setWindow(w.date, { time_start: e.target.value })}
+                  />
+                  <Input
+                    label="End"
+                    type="time"
+                    value={w.time_end}
+                    onChange={(e) => setWindow(w.date, { time_end: e.target.value })}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -522,6 +570,13 @@ function StepConfirm({
   onBack: () => void;
   onSubmit: () => void;
 }) {
+  const fmtDay = (iso: string) =>
+    new Date(iso + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  const datePart =
+    form.scheduledDate === form.scheduledDateEnd
+      ? fmtDay(form.scheduledDate)
+      : `${fmtDay(form.scheduledDate)} – ${fmtDay(form.scheduledDateEnd)}`;
+
   return (
     <Card>
       <div className="text-sm font-semibold text-ink-900">Review</div>
@@ -529,7 +584,28 @@ function StepConfirm({
         <Row k="Customer" v={form.farmerName || "Selected farmer"} />
         <Row k="Village" v={form.village || "—"} />
         <Row k="Crop" v={`${form.crop} · ${form.areaAcres} ac`} />
-        <Row k="Date" v={form.scheduledDate} />
+        <Row k="Date" v={datePart} />
+        <li className="py-2">
+          <div className="flex items-start justify-between gap-3">
+            <span className="text-xs text-ink-500 pt-0.5">Time window</span>
+            <div className="text-sm font-medium text-ink-900 text-right">
+              {form.allDay ? (
+                <span>All day</span>
+              ) : (
+                <ul className="space-y-0.5">
+                  {form.windows.map((w) => (
+                    <li key={w.date} className="tnum">
+                      {form.windows.length > 1 && (
+                        <span className="text-xs text-ink-500 mr-2">{fmtDay(w.date)}</span>
+                      )}
+                      {w.time_start} – {w.time_end}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </li>
         <Row k="Spray" v={`${form.sprayType}${form.pesticideName ? ` · ${form.pesticideName}` : ""}`} />
       </ul>
 
@@ -557,7 +633,7 @@ function Row({ k, v }: { k: string; v: string }) {
 }
 
 function AvailabilityCheck({ form }: { form: FormState }) {
-  const [check, setCheck] = useState<WindowConflict | null>(null);
+  const [check, setCheck] = useState<WindowsConflict | null>(null);
   const [checking, setChecking] = useState(false);
   const [tenantId, setTenantId] = useState<string | null>(null);
 
@@ -567,6 +643,9 @@ function AvailabilityCheck({ form }: { form: FormState }) {
     });
   }, []);
 
+  // Stringify deps so React re-runs when the underlying windows actually change.
+  const windowsKey = form.windows.map((w) => `${w.date}|${w.time_start}|${w.time_end}`).join("/");
+
   useEffect(() => {
     if (!tenantId || form.allDay) {
       setCheck(null);
@@ -574,12 +653,12 @@ function AvailabilityCheck({ form }: { form: FormState }) {
     }
     setChecking(true);
     const t = setTimeout(async () => {
-      const { data } = await checkWindowConflict(tenantId, form.scheduledDate, form.timeStart, form.timeEnd);
-      setCheck(data as WindowConflict);
+      const { data } = await checkWindowsConflict(tenantId, form.windows);
+      setCheck(data as WindowsConflict);
       setChecking(false);
     }, 300);
     return () => clearTimeout(t);
-  }, [tenantId, form.scheduledDate, form.timeStart, form.timeEnd, form.allDay]);
+  }, [tenantId, windowsKey, form.allDay]);
 
   if (form.allDay) return null;
   if (checking && !check) {
@@ -593,28 +672,42 @@ function AvailabilityCheck({ form }: { form: FormState }) {
       </div>
     );
   }
+  const badDays = check.per_day.filter((d) => !d.result.ok);
   return (
-    <div className="mt-3 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-800 space-y-1">
+    <div className="mt-3 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-800 space-y-2">
       <div className="flex items-center gap-2 font-medium">
         <XCircle className="h-4 w-4" /> Conflict — adjust the window
       </div>
-      {check.out_of_hours && check.working_hours && (
-        <div className="flex items-center gap-1.5">
-          <AlertTriangle className="h-3 w-3" />
-          Outside working hours ({check.working_hours.start.slice(0, 5)} – {check.working_hours.end.slice(0, 5)})
-        </div>
-      )}
-      {check.blocks.map((b) => (
-        <div key={b.id} className="flex items-center gap-1.5">
-          <AlertTriangle className="h-3 w-3" />
-          Blocked {b.time_start.slice(0, 5)} – {b.time_end.slice(0, 5)}
-          {b.reason ? ` (${b.reason})` : ""}
-        </div>
-      ))}
-      {check.jobs.map((j) => (
-        <div key={j.id} className="flex items-center gap-1.5">
-          <AlertTriangle className="h-3 w-3" />
-          Overlaps with <span className="font-mono">{j.number}</span> {j.time_start.slice(0, 5)} – {j.time_end.slice(0, 5)}
+      {badDays.map((d) => (
+        <div key={d.date} className="space-y-0.5">
+          {check.per_day.length > 1 && (
+            <div className="text-[11px] font-semibold">
+              {new Date(d.date + "T00:00:00").toLocaleDateString("en-IN", {
+                weekday: "short",
+                day: "2-digit",
+                month: "short",
+              })}
+            </div>
+          )}
+          {d.result.out_of_hours && d.result.working_hours && (
+            <div className="flex items-center gap-1.5">
+              <AlertTriangle className="h-3 w-3" />
+              Outside working hours ({d.result.working_hours.start.slice(0, 5)} – {d.result.working_hours.end.slice(0, 5)})
+            </div>
+          )}
+          {d.result.blocks.map((b) => (
+            <div key={b.id} className="flex items-center gap-1.5">
+              <AlertTriangle className="h-3 w-3" />
+              Blocked {b.time_start.slice(0, 5)} – {b.time_end.slice(0, 5)}
+              {b.reason ? ` (${b.reason})` : ""}
+            </div>
+          ))}
+          {d.result.jobs.map((j) => (
+            <div key={j.id} className="flex items-center gap-1.5">
+              <AlertTriangle className="h-3 w-3" />
+              Overlaps with <span className="font-mono">{j.number}</span> {j.time_start.slice(0, 5)} – {j.time_end.slice(0, 5)}
+            </div>
+          ))}
         </div>
       ))}
     </div>

@@ -31,6 +31,7 @@ import {
   generateInvoice,
   getInvoiceForJob,
   getJob,
+  listJobWindows,
   listSortiesForJob,
   listDrones,
   listPilots,
@@ -39,6 +40,7 @@ import {
   rescheduleJob,
   startSortie,
   submitJobForCompliance,
+  type JobWindow,
 } from "@/data/queries";
 import { inr } from "@/lib/utils";
 
@@ -64,6 +66,7 @@ export default function JobDetail() {
   const job = useSupabaseQuery(() => getJob(id!), [id]);
   const sorties = useSupabaseQuery(() => listSortiesForJob(id!), [id]);
   const invoice = useSupabaseQuery(() => getInvoiceForJob(id!), [id]);
+  const windows = useSupabaseQuery(() => listJobWindows(id!), [id]);
   const drones = useSupabaseQuery(listDrones, []);
   const pilots = useSupabaseQuery(listPilots, []);
 
@@ -77,7 +80,7 @@ export default function JobDetail() {
   const j = job.data;
 
   async function refresh() {
-    await Promise.all([job.refresh(), sorties.refresh(), invoice.refresh()]);
+    await Promise.all([job.refresh(), sorties.refresh(), invoice.refresh(), windows.refresh()]);
   }
 
   async function act(fn: () => Promise<{ error: { message: string } | null }>) {
@@ -196,7 +199,7 @@ export default function JobDetail() {
             <h1 className="mt-3 text-xl font-bold">{farmer?.name ?? "Walk-in customer"}</h1>
             <div className="text-sm text-white/80 mt-1">{j.number}</div>
             <div className="mt-3 text-sm text-white/90">
-              {j.crop} · {j.area_acres} acres · {formatJobWhen(j)}
+              {j.crop} · {j.area_acres} acres · {formatJobWhen(j, windows.data ?? [])}
             </div>
             {(j.reschedule_count ?? 0) > 0 && (
               <div className="mt-2 text-[11px] text-white/70">
@@ -330,9 +333,21 @@ export default function JobDetail() {
           </Card>
           <Card>
             <CardSubtitle>Date</CardSubtitle>
-            <div className="mt-1 flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-brand-700" />
-              <span className="font-semibold text-ink-900">{formatJobWhen(j)}</span>
+            <div className="mt-1 flex items-start gap-2">
+              <Calendar className="h-4 w-4 text-brand-700 mt-0.5" />
+              <div className="font-semibold text-ink-900 text-sm leading-tight">
+                {windows.data && windows.data.length > 1 ? (
+                  <ul className="space-y-0.5">
+                    {windows.data.map((w) => (
+                      <li key={w.id} className="tnum text-xs">
+                        {fmtDay(w.date)} · {w.time_start.slice(0, 5)}–{w.time_end.slice(0, 5)}
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <span>{formatJobWhen(j, windows.data ?? [])}</span>
+                )}
+              </div>
             </div>
           </Card>
           <Card>
@@ -527,20 +542,35 @@ export default function JobDetail() {
   );
 }
 
-// Pretty-print "May 20" / "May 20 – 22" / "May 20, 08:00 – 12:00" depending on
-// which combination of date_end / time_start / time_end is set.
-function formatJobWhen(j: {
-  scheduled_date: string;
-  scheduled_date_end?: string | null;
-  scheduled_time_start?: string | null;
-  scheduled_time_end?: string | null;
-}): string {
-  const fmtDay = (iso: string) =>
-    new Date(iso + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+const fmtDay = (iso: string) =>
+  new Date(iso + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+
+// Pretty-print the date/range. When the job has per-day windows, summarises as
+// "May 20 · 07:00–12:00" for single-day, or "May 20–22 (varies)" if windows
+// differ across days. Falls back to scheduled_date/time fields if no windows.
+function formatJobWhen(
+  j: {
+    scheduled_date: string;
+    scheduled_date_end?: string | null;
+    scheduled_time_start?: string | null;
+    scheduled_time_end?: string | null;
+  },
+  jobWindows: JobWindow[],
+): string {
   const datePart =
     !j.scheduled_date_end || j.scheduled_date_end === j.scheduled_date
       ? fmtDay(j.scheduled_date)
       : `${fmtDay(j.scheduled_date)} – ${fmtDay(j.scheduled_date_end)}`;
+  if (jobWindows.length > 0) {
+    const first = jobWindows[0];
+    const allSame = jobWindows.every(
+      (w) => w.time_start === first.time_start && w.time_end === first.time_end,
+    );
+    if (allSame) {
+      return `${datePart}, ${first.time_start.slice(0, 5)} – ${first.time_end.slice(0, 5)}`;
+    }
+    return `${datePart} · windows vary`;
+  }
   if (!j.scheduled_time_start || !j.scheduled_time_end) return datePart;
   return `${datePart}, ${j.scheduled_time_start.slice(0, 5)} – ${j.scheduled_time_end.slice(0, 5)}`;
 }
