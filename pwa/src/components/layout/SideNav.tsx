@@ -9,12 +9,14 @@ import {
   Users,
   ScrollText,
   Settings,
+  CalendarRange,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const links = [
   { to: "/", label: "Dashboard", icon: Home },
   { to: "/jobs", label: "Jobs", icon: ClipboardList },
+  { to: "/slots", label: "Slot manager", icon: CalendarRange },
   { to: "/queries", label: "Queries", icon: MessageSquare },
   { to: "/wishlist", label: "Wishlist", icon: Heart },
   { to: "/compliance", label: "Compliance", icon: ShieldCheck },
