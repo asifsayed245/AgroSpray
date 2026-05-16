@@ -78,6 +78,7 @@ function WeatherStrip({
 
 const STATE_FILTERS = [
   "all",
+  "inquiry",
   "compliance",
   "confirmed",
   "crew_assigned",
@@ -90,6 +91,7 @@ const STATE_FILTERS = [
 const stateLabel: Record<string, string> = {
   draft: "Draft",
   compliance: "Compliance",
+  inquiry: "Inquiry",
   confirmed: "Confirmed",
   crew_assigned: "Crew assigned",
   in_progress: "In progress",
@@ -106,6 +108,7 @@ const stateLabel: Record<string, string> = {
 const stateTone: Record<string, Parameters<typeof Badge>[0]["tone"]> = {
   draft: "neutral",
   compliance: "warn",
+  inquiry: "warn",
   confirmed: "info",
   crew_assigned: "info",
   in_progress: "brand",
@@ -118,6 +121,17 @@ const stateTone: Record<string, Parameters<typeof Badge>[0]["tone"]> = {
   failed: "danger",
   disputed: "danger",
 };
+
+function formatWhenShort(j: JobRow): string {
+  const fmtDay = (iso: string) =>
+    new Date(iso + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  const datePart =
+    !j.scheduled_date_end || j.scheduled_date_end === j.scheduled_date
+      ? fmtDay(j.scheduled_date)
+      : `${fmtDay(j.scheduled_date)}–${fmtDay(j.scheduled_date_end)}`;
+  if (!j.scheduled_time_start || !j.scheduled_time_end) return datePart;
+  return `${datePart} · ${j.scheduled_time_start.slice(0, 5)}–${j.scheduled_time_end.slice(0, 5)}`;
+}
 
 export default function Jobs() {
   const [filter, setFilter] = useState<(typeof STATE_FILTERS)[number]>("all");
@@ -220,7 +234,7 @@ export default function Jobs() {
                               : ""
                           }
                         >
-                          {j.scheduled_date}
+                          {formatWhenShort(j)}
                         </span>
                       </div>
                       <div className="text-[11px] text-ink-400 truncate mt-0.5">{j.number}</div>

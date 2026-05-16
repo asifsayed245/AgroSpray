@@ -737,6 +737,9 @@ export type Database = {
           pricing_snapshot: Json | null
           reschedule_count: number
           scheduled_date: string
+          scheduled_date_end: string | null
+          scheduled_time_end: string | null
+          scheduled_time_start: string | null
           spray_type: string | null
           state: Database["public"]["Enums"]["job_state"]
           state_history: Json
@@ -769,6 +772,9 @@ export type Database = {
           pricing_snapshot?: Json | null
           reschedule_count?: number
           scheduled_date: string
+          scheduled_date_end?: string | null
+          scheduled_time_end?: string | null
+          scheduled_time_start?: string | null
           spray_type?: string | null
           state?: Database["public"]["Enums"]["job_state"]
           state_history?: Json
@@ -801,6 +807,9 @@ export type Database = {
           pricing_snapshot?: Json | null
           reschedule_count?: number
           scheduled_date?: string
+          scheduled_date_end?: string | null
+          scheduled_time_end?: string | null
+          scheduled_time_start?: string | null
           spray_type?: string | null
           state?: Database["public"]["Enums"]["job_state"]
           state_history?: Json
@@ -1128,6 +1137,64 @@ export type Database = {
           },
         ]
       }
+      slot_blocks: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          date: string
+          drone_id: string | null
+          id: string
+          reason: string | null
+          tenant_id: string
+          time_end: string
+          time_start: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          date: string
+          drone_id?: string | null
+          id?: string
+          reason?: string | null
+          tenant_id: string
+          time_end: string
+          time_start: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          drone_id?: string | null
+          id?: string
+          reason?: string | null
+          tenant_id?: string
+          time_end?: string
+          time_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "slot_blocks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slot_blocks_drone_id_fkey"
+            columns: ["drone_id"]
+            isOneToOne: false
+            referencedRelation: "drones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "slot_blocks_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       slots: {
         Row: {
           booked: number
@@ -1350,6 +1417,8 @@ export type Database = {
           upi_vpa: string | null
           version: number
           weather_policy: Json
+          working_hours_end: string
+          working_hours_start: string
         }
         Insert: {
           activated_at?: string | null
@@ -1374,6 +1443,8 @@ export type Database = {
           upi_vpa?: string | null
           version?: number
           weather_policy?: Json
+          working_hours_end?: string
+          working_hours_start?: string
         }
         Update: {
           activated_at?: string | null
@@ -1398,6 +1469,8 @@ export type Database = {
           upi_vpa?: string | null
           version?: number
           weather_policy?: Json
+          working_hours_end?: string
+          working_hours_start?: string
         }
         Relationships: []
       }
@@ -1596,6 +1669,9 @@ export type Database = {
           pricing_snapshot: Json | null
           reschedule_count: number
           scheduled_date: string
+          scheduled_date_end: string | null
+          scheduled_time_end: string | null
+          scheduled_time_start: string | null
           spray_type: string | null
           state: Database["public"]["Enums"]["job_state"]
           state_history: Json
@@ -1638,6 +1714,9 @@ export type Database = {
           pricing_snapshot: Json | null
           reschedule_count: number
           scheduled_date: string
+          scheduled_date_end: string | null
+          scheduled_time_end: string | null
+          scheduled_time_start: string | null
           spray_type: string | null
           state: Database["public"]["Enums"]["job_state"]
           state_history: Json
@@ -1677,6 +1756,16 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      check_window_conflict: {
+        Args: {
+          p_date: string
+          p_exclude_job_id?: string
+          p_tenant_id: string
+          p_time_end: string
+          p_time_start: string
+        }
+        Returns: Json
       }
       close_farmer_query: {
         Args: { p_query_id: string }
@@ -1765,6 +1854,58 @@ export type Database = {
           pricing_snapshot: Json | null
           reschedule_count: number
           scheduled_date: string
+          scheduled_date_end: string | null
+          scheduled_time_end: string | null
+          scheduled_time_start: string | null
+          spray_type: string | null
+          state: Database["public"]["Enums"]["job_state"]
+          state_history: Json
+          tenant_id: string
+          updated_at: string
+          version: number
+          village: string | null
+          weather_evaluated_at: string | null
+          weather_last_notified_safety: string | null
+          weather_safety: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "jobs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      confirm_inquiry: {
+        Args: {
+          p_date_end?: string
+          p_job_id: string
+          p_time_end: string
+          p_time_start: string
+        }
+        Returns: {
+          area: number
+          area_acres: number
+          area_unit: Database["public"]["Enums"]["area_unit"]
+          assigned_drone_id: string | null
+          assigned_pilot_id: string | null
+          cancel_reason: string | null
+          created_at: string
+          crop: string
+          farmer_id: string
+          id: string
+          location_lat: number | null
+          location_lng: number | null
+          location_polygon: Json | null
+          number: string
+          override_reason: string | null
+          pesticide_brand: string | null
+          pesticide_name: string | null
+          pricing_snapshot: Json | null
+          reschedule_count: number
+          scheduled_date: string
+          scheduled_date_end: string | null
+          scheduled_time_end: string | null
+          scheduled_time_start: string | null
           spray_type: string | null
           state: Database["public"]["Enums"]["job_state"]
           state_history: Json
@@ -1806,6 +1947,9 @@ export type Database = {
           pricing_snapshot: Json | null
           reschedule_count: number
           scheduled_date: string
+          scheduled_date_end: string | null
+          scheduled_time_end: string | null
+          scheduled_time_start: string | null
           spray_type: string | null
           state: Database["public"]["Enums"]["job_state"]
           state_history: Json
@@ -1968,6 +2112,9 @@ export type Database = {
           pricing_snapshot: Json | null
           reschedule_count: number
           scheduled_date: string
+          scheduled_date_end: string | null
+          scheduled_time_end: string | null
+          scheduled_time_start: string | null
           spray_type: string | null
           state: Database["public"]["Enums"]["job_state"]
           state_history: Json
@@ -2021,46 +2168,105 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      reschedule_job: {
-        Args: { p_job_id: string; p_new_date: string; p_reason: string }
-        Returns: {
-          area: number
-          area_acres: number
-          area_unit: Database["public"]["Enums"]["area_unit"]
-          assigned_drone_id: string | null
-          assigned_pilot_id: string | null
-          cancel_reason: string | null
-          created_at: string
-          crop: string
-          farmer_id: string
-          id: string
-          location_lat: number | null
-          location_lng: number | null
-          location_polygon: Json | null
-          number: string
-          override_reason: string | null
-          pesticide_brand: string | null
-          pesticide_name: string | null
-          pricing_snapshot: Json | null
-          reschedule_count: number
-          scheduled_date: string
-          spray_type: string | null
-          state: Database["public"]["Enums"]["job_state"]
-          state_history: Json
-          tenant_id: string
-          updated_at: string
-          version: number
-          village: string | null
-          weather_evaluated_at: string | null
-          weather_last_notified_safety: string | null
-          weather_safety: string | null
-        }
-        SetofOptions: {
-          from: "*"
-          to: "jobs"
-          isOneToOne: true
-          isSetofReturn: false
-        }
+      reschedule_job:
+        | {
+            Args: {
+              p_job_id: string
+              p_new_date: string
+              p_new_date_end: string
+              p_reason: string
+              p_time_end: string
+              p_time_start: string
+            }
+            Returns: {
+              area: number
+              area_acres: number
+              area_unit: Database["public"]["Enums"]["area_unit"]
+              assigned_drone_id: string | null
+              assigned_pilot_id: string | null
+              cancel_reason: string | null
+              created_at: string
+              crop: string
+              farmer_id: string
+              id: string
+              location_lat: number | null
+              location_lng: number | null
+              location_polygon: Json | null
+              number: string
+              override_reason: string | null
+              pesticide_brand: string | null
+              pesticide_name: string | null
+              pricing_snapshot: Json | null
+              reschedule_count: number
+              scheduled_date: string
+              scheduled_date_end: string | null
+              scheduled_time_end: string | null
+              scheduled_time_start: string | null
+              spray_type: string | null
+              state: Database["public"]["Enums"]["job_state"]
+              state_history: Json
+              tenant_id: string
+              updated_at: string
+              version: number
+              village: string | null
+              weather_evaluated_at: string | null
+              weather_last_notified_safety: string | null
+              weather_safety: string | null
+            }
+            SetofOptions: {
+              from: "*"
+              to: "jobs"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+        | {
+            Args: { p_job_id: string; p_new_date: string; p_reason: string }
+            Returns: {
+              area: number
+              area_acres: number
+              area_unit: Database["public"]["Enums"]["area_unit"]
+              assigned_drone_id: string | null
+              assigned_pilot_id: string | null
+              cancel_reason: string | null
+              created_at: string
+              crop: string
+              farmer_id: string
+              id: string
+              location_lat: number | null
+              location_lng: number | null
+              location_polygon: Json | null
+              number: string
+              override_reason: string | null
+              pesticide_brand: string | null
+              pesticide_name: string | null
+              pricing_snapshot: Json | null
+              reschedule_count: number
+              scheduled_date: string
+              scheduled_date_end: string | null
+              scheduled_time_end: string | null
+              scheduled_time_start: string | null
+              spray_type: string | null
+              state: Database["public"]["Enums"]["job_state"]
+              state_history: Json
+              tenant_id: string
+              updated_at: string
+              version: number
+              village: string | null
+              weather_evaluated_at: string | null
+              weather_last_notified_safety: string | null
+              weather_safety: string | null
+            }
+            SetofOptions: {
+              from: "*"
+              to: "jobs"
+              isOneToOne: true
+              isSetofReturn: false
+            }
+          }
+      reserve_date_range: {
+        Args: { p_date_end: string; p_date_start: string; p_tenant_id: string }
+        Returns: boolean
       }
       reserve_slot: {
         Args: { p_date: string; p_tenant_id: string }
@@ -2120,6 +2326,9 @@ export type Database = {
           pricing_snapshot: Json | null
           reschedule_count: number
           scheduled_date: string
+          scheduled_date_end: string | null
+          scheduled_time_end: string | null
+          scheduled_time_start: string | null
           spray_type: string | null
           state: Database["public"]["Enums"]["job_state"]
           state_history: Json
@@ -2201,6 +2410,7 @@ export type Database = {
       job_state:
         | "draft"
         | "compliance"
+        | "inquiry"
         | "confirmed"
         | "crew_assigned"
         | "in_progress"
@@ -2377,6 +2587,7 @@ export const Constants = {
       job_state: [
         "draft",
         "compliance",
+        "inquiry",
         "confirmed",
         "crew_assigned",
         "in_progress",

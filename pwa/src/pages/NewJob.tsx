@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, Wheat, Calendar, Beaker, User } from "lucide-react";
+import { ArrowRight, Wheat, Calendar, Beaker, User, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { IconTile } from "@/components/ui/icon-tile";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useSupabaseQuery } from "@/hooks/useSupabaseQuery";
-import { listFarmers, submitJobForCompliance } from "@/data/queries";
+import { checkWindowConflict, listFarmers, submitJobForCompliance, type WindowConflict } from "@/data/queries";
 
 const STEPS = ["Customer", "Field", "Schedule", "Spray", "Confirm"] as const;
 
@@ -21,6 +21,10 @@ type FormState = {
   crop: string;
   areaAcres: number;
   scheduledDate: string;
+  scheduledDateEnd: string;
+  timeStart: string;
+  timeEnd: string;
+  allDay: boolean;
   sprayType: string;
   pesticideName: string;
 };
@@ -41,6 +45,10 @@ export default function NewJob() {
     crop: "cotton",
     areaAcres: 5,
     scheduledDate: new Date(Date.now() + 86400e3).toISOString().slice(0, 10),
+    scheduledDateEnd: new Date(Date.now() + 86400e3).toISOString().slice(0, 10),
+    timeStart: "08:00",
+    timeEnd: "12:00",
+    allDay: false,
     sprayType: "insecticide",
     pesticideName: "",
   });
@@ -91,6 +99,12 @@ export default function NewJob() {
           area: form.areaAcres,
           area_acres: form.areaAcres,
           scheduled_date: form.scheduledDate,
+          scheduled_date_end:
+            form.scheduledDateEnd && form.scheduledDateEnd !== form.scheduledDate
+              ? form.scheduledDateEnd
+              : null,
+          scheduled_time_start: form.allDay ? null : form.timeStart,
+          scheduled_time_end: form.allDay ? null : form.timeEnd,
           village: form.village,
           spray_type: form.sprayType,
           pesticide_name: form.pesticideName || null,
@@ -377,13 +391,61 @@ function StepSchedule({
         ))}
       </div>
 
-      <Input
-        className="mt-3"
-        label="Or pick a specific date"
-        type="date"
-        value={form.scheduledDate}
-        onChange={(e) => update({ scheduledDate: e.target.value })}
-      />
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Input
+          label="Start date"
+          type="date"
+          value={form.scheduledDate}
+          onChange={(e) => {
+            const v = e.target.value;
+            // Keep end >= start
+            update({
+              scheduledDate: v,
+              scheduledDateEnd: form.scheduledDateEnd < v ? v : form.scheduledDateEnd,
+            });
+          }}
+        />
+        <Input
+          label="End date (multi-day)"
+          type="date"
+          value={form.scheduledDateEnd}
+          min={form.scheduledDate}
+          onChange={(e) => update({ scheduledDateEnd: e.target.value })}
+          hint="Same as start for single-day"
+        />
+      </div>
+
+      <div className="mt-3 rounded-2xl border border-ink-900/5 bg-canvas p-3">
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-semibold text-ink-900">Time window</div>
+          <label className="flex items-center gap-1.5 text-[11px] text-ink-700">
+            <input
+              type="checkbox"
+              checked={form.allDay}
+              onChange={(e) => update({ allDay: e.target.checked })}
+            />
+            All day
+          </label>
+        </div>
+        {!form.allDay && (
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <Input
+              label="Start"
+              type="time"
+              value={form.timeStart}
+              onChange={(e) => update({ timeStart: e.target.value })}
+            />
+            <Input
+              label="End"
+              type="time"
+              value={form.timeEnd}
+              onChange={(e) => update({ timeEnd: e.target.value })}
+            />
+          </div>
+        )}
+      </div>
+
+      <AvailabilityCheck form={form} />
 
       <div className="mt-5 grid grid-cols-2 gap-2">
         <Button variant="outline" block onClick={onBack}>Back</Button>
@@ -491,5 +553,70 @@ function Row({ k, v }: { k: string; v: string }) {
       <span className="text-xs text-ink-500">{k}</span>
       <span className="text-sm font-medium text-ink-900 text-right">{v}</span>
     </li>
+  );
+}
+
+function AvailabilityCheck({ form }: { form: FormState }) {
+  const [check, setCheck] = useState<WindowConflict | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [tenantId, setTenantId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.from("profiles").select("tenant_id").maybeSingle().then(({ data }) => {
+      setTenantId((data as { tenant_id?: string } | null)?.tenant_id ?? null);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!tenantId || form.allDay) {
+      setCheck(null);
+      return;
+    }
+    setChecking(true);
+    const t = setTimeout(async () => {
+      const { data } = await checkWindowConflict(tenantId, form.scheduledDate, form.timeStart, form.timeEnd);
+      setCheck(data as WindowConflict);
+      setChecking(false);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [tenantId, form.scheduledDate, form.timeStart, form.timeEnd, form.allDay]);
+
+  if (form.allDay) return null;
+  if (checking && !check) {
+    return <div className="mt-3 rounded-xl bg-canvas px-3 py-2 text-xs text-ink-500">Checking availability…</div>;
+  }
+  if (!check) return null;
+  if (check.ok) {
+    return (
+      <div className="mt-3 rounded-xl bg-mint-50 border border-mint-200 px-3 py-2 text-xs text-mint-800 flex items-center gap-2">
+        <CheckCircle2 className="h-4 w-4" /> Available — no conflicts.
+      </div>
+    );
+  }
+  return (
+    <div className="mt-3 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-800 space-y-1">
+      <div className="flex items-center gap-2 font-medium">
+        <XCircle className="h-4 w-4" /> Conflict — adjust the window
+      </div>
+      {check.out_of_hours && check.working_hours && (
+        <div className="flex items-center gap-1.5">
+          <AlertTriangle className="h-3 w-3" />
+          Outside working hours ({check.working_hours.start.slice(0, 5)} – {check.working_hours.end.slice(0, 5)})
+        </div>
+      )}
+      {check.blocks.map((b) => (
+        <div key={b.id} className="flex items-center gap-1.5">
+          <AlertTriangle className="h-3 w-3" />
+          Blocked {b.time_start.slice(0, 5)} – {b.time_end.slice(0, 5)}
+          {b.reason ? ` (${b.reason})` : ""}
+        </div>
+      ))}
+      {check.jobs.map((j) => (
+        <div key={j.id} className="flex items-center gap-1.5">
+          <AlertTriangle className="h-3 w-3" />
+          Overlaps with <span className="font-mono">{j.number}</span> {j.time_start.slice(0, 5)} – {j.time_end.slice(0, 5)}
+        </div>
+      ))}
+    </div>
   );
 }

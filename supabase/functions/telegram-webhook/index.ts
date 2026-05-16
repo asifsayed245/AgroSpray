@@ -53,6 +53,7 @@ type Strings = {
   askVillage: string;
   askSprayType: string;
   askConfirm: (d: Draft) => string;
+  inquiryReceived: (n: string) => string;
   confirmed: (n: string, total: string) => string;
   wishlisted: (n: string) => string;
   compFail: (n: string) => string;
@@ -103,6 +104,8 @@ const STRINGS: Record<Lang, Strings> = {
       `• Date: ${d.scheduled_date}\n` +
       `• Village: ${d.village}\n` +
       `• Spray: ${d.spray_type}\n\nTap *Confirm* to book.`,
+    inquiryReceived: (n) =>
+      `📋 *Got it!* Your booking is in.\nReference: \`${n}\`\n\nOur team will check time feasibility and confirm a slot within a few hours. You'll get a message here once the time is locked in.`,
     confirmed: (n, total) =>
       `✅ *Booking confirmed!*\nJob: \`${n}\`\nEstimated total: ₹${total}\n\nOur ops team will assign a crew and reach out before the visit.`,
     wishlisted: (n) =>
@@ -154,6 +157,8 @@ const STRINGS: Record<Lang, Strings> = {
       `• तारीख: ${d.scheduled_date}\n` +
       `• गाँव: ${d.village}\n` +
       `• स्प्रे: ${d.spray_type}\n\nबुक करने के लिए *पुष्टि करें* दबाएँ।`,
+    inquiryReceived: (n) =>
+      `📋 *मिल गया!* आपकी बुकिंग दर्ज हो गई है।\nरेफरेंस: \`${n}\`\n\nहमारी टीम समय की उपलब्धता देख कर कुछ ही घंटों में स्लॉट पक्का करेगी। समय फिक्स होते ही आपको यहाँ मैसेज मिलेगा।`,
     confirmed: (n, total) =>
       `✅ *बुकिंग पक्की!*\nजॉब: \`${n}\`\nअनुमानित कुल: ₹${total}\n\nहमारी ऑप्स टीम क्रू भेजेगी और विज़िट से पहले आपको कॉल करेगी।`,
     wishlisted: (n) =>
@@ -205,6 +210,8 @@ const STRINGS: Record<Lang, Strings> = {
       `• तारीख: ${d.scheduled_date}\n` +
       `• गाव: ${d.village}\n` +
       `• फवारणी: ${d.spray_type}\n\nबुक करण्यासाठी *पुष्टी* दाबा.`,
+    inquiryReceived: (n) =>
+      `📋 *मिळालं!* तुमची बुकिंग नोंदवली आहे.\nरेफरन्स: \`${n}\`\n\nआमची टीम वेळ तपासून काही तासांत स्लॉट पक्का करेल. वेळ ठरताच तुम्हाला इथे संदेश मिळेल.`,
     confirmed: (n, total) =>
       `✅ *बुकिंग पक्की!*\nजॉब: \`${n}\`\nअंदाजे एकूण: ₹${total}\n\nआमची ऑप्स टीम क्रू पाठवेल आणि भेटीपूर्वी तुम्हाला कॉल करेल.`,
     wishlisted: (n) =>
@@ -703,6 +710,9 @@ async function handleInput(
           return reply(token, tenantId, chatId, `❌ ${error.message}`);
         }
         const r = data as { status: string; job_number?: string; total?: string };
+        if (r.status === "inquiry") {
+          return reply(token, tenantId, chatId, s.inquiryReceived(r.job_number ?? "AGR-?"));
+        }
         if (r.status === "confirmed") {
           return reply(token, tenantId, chatId, s.confirmed(r.job_number ?? "AGR-?", r.total ?? "0"));
         }

@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { IconTile } from "@/components/ui/icon-tile";
 import { OverrideModal } from "@/components/OverrideModal";
+import { ConfirmInquiryModal } from "@/components/ConfirmInquiryModal";
 import { WeatherCard } from "@/components/WeatherCard";
 import { useSupabaseQuery } from "@/hooks/useSupabaseQuery";
 import {
@@ -44,6 +45,7 @@ import { inr } from "@/lib/utils";
 const STATE_LABEL: Record<string, string> = {
   draft: "Draft",
   compliance: "Compliance",
+  inquiry: "Inquiry",
   confirmed: "Confirmed",
   crew_assigned: "Crew assigned",
   in_progress: "In progress",
@@ -67,6 +69,7 @@ export default function JobDetail() {
 
   const [showOverride, setShowOverride] = useState(false);
   const [showReschedule, setShowReschedule] = useState(false);
+  const [showConfirmInquiry, setShowConfirmInquiry] = useState(false);
   const [rescheduleDate, setRescheduleDate] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -193,7 +196,7 @@ export default function JobDetail() {
             <h1 className="mt-3 text-xl font-bold">{farmer?.name ?? "Walk-in customer"}</h1>
             <div className="text-sm text-white/80 mt-1">{j.number}</div>
             <div className="mt-3 text-sm text-white/90">
-              {j.crop} · {j.area_acres} acres · {j.scheduled_date}
+              {j.crop} · {j.area_acres} acres · {formatJobWhen(j)}
             </div>
             {(j.reschedule_count ?? 0) > 0 && (
               <div className="mt-2 text-[11px] text-white/70">
@@ -224,6 +227,11 @@ export default function JobDetail() {
                 return { error: r.error };
               })}>
                 <ShieldCheck className="h-4 w-4" /> Run compliance
+              </Button>
+            )}
+            {j.state === "inquiry" && (
+              <Button block disabled={busy} onClick={() => setShowConfirmInquiry(true)}>
+                <CheckCircle2 className="h-4 w-4" /> Confirm inquiry
               </Button>
             )}
             {j.state === "confirmed" && (
@@ -324,7 +332,7 @@ export default function JobDetail() {
             <CardSubtitle>Date</CardSubtitle>
             <div className="mt-1 flex items-center gap-2">
               <Calendar className="h-4 w-4 text-brand-700" />
-              <span className="font-semibold text-ink-900">{j.scheduled_date}</span>
+              <span className="font-semibold text-ink-900">{formatJobWhen(j)}</span>
             </div>
           </Card>
           <Card>
@@ -498,8 +506,43 @@ export default function JobDetail() {
           setShowOverride(false);
         }}
       />
+
+      {showConfirmInquiry && (j as { tenant_id?: string }).tenant_id && (
+        <ConfirmInquiryModal
+          jobId={j.id}
+          jobNumber={j.number}
+          tenantId={(j as { tenant_id: string }).tenant_id}
+          scheduledDate={j.scheduled_date}
+          scheduledDateEnd={j.scheduled_date_end ?? null}
+          defaultStart={j.scheduled_time_start ?? "08:00"}
+          defaultEnd={j.scheduled_time_end ?? "12:00"}
+          onClose={() => setShowConfirmInquiry(false)}
+          onConfirmed={() => {
+            setShowConfirmInquiry(false);
+            refresh();
+          }}
+        />
+      )}
     </>
   );
+}
+
+// Pretty-print "May 20" / "May 20 – 22" / "May 20, 08:00 – 12:00" depending on
+// which combination of date_end / time_start / time_end is set.
+function formatJobWhen(j: {
+  scheduled_date: string;
+  scheduled_date_end?: string | null;
+  scheduled_time_start?: string | null;
+  scheduled_time_end?: string | null;
+}): string {
+  const fmtDay = (iso: string) =>
+    new Date(iso + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+  const datePart =
+    !j.scheduled_date_end || j.scheduled_date_end === j.scheduled_date
+      ? fmtDay(j.scheduled_date)
+      : `${fmtDay(j.scheduled_date)} – ${fmtDay(j.scheduled_date_end)}`;
+  if (!j.scheduled_time_start || !j.scheduled_time_end) return datePart;
+  return `${datePart}, ${j.scheduled_time_start.slice(0, 5)} – ${j.scheduled_time_end.slice(0, 5)}`;
 }
 
 function Row({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {

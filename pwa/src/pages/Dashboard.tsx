@@ -1,12 +1,12 @@
 import { Link } from "react-router-dom";
 import {
   ShieldCheck,
-  Plane,
   Calendar,
   Wheat,
   ChevronRight,
   AlertCircle,
   Cloud,
+  Inbox,
 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { PrimaryStatCard } from "@/components/layout/PrimaryStatCard";
@@ -17,7 +17,7 @@ import { StatArc } from "@/components/ui/stat-arc";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { useSupabaseQuery } from "@/hooks/useSupabaseQuery";
-import { dashboardSummary, listJobs, listComplianceBlocks, weatherAlertsCount } from "@/data/queries";
+import { dashboardSummary, listJobs, listComplianceBlocks, weatherAlertsCount, inquiryCount } from "@/data/queries";
 import { inr } from "@/lib/utils";
 
 const stateTone: Record<string, Parameters<typeof Badge>[0]["tone"]> = {
@@ -56,6 +56,10 @@ export default function Dashboard() {
   const summaryQ = useSupabaseQuery(async () => ({ data: await dashboardSummary(), error: null }));
   const weatherQ = useSupabaseQuery(async () => {
     const { count, error } = await weatherAlertsCount();
+    return { data: count ?? 0, error };
+  });
+  const inquiriesQ = useSupabaseQuery(async () => {
+    const { count, error } = await inquiryCount();
     return { data: count ?? 0, error };
   });
   const today = new Date().toISOString().slice(0, 10);
@@ -101,6 +105,7 @@ export default function Dashboard() {
               blocks={blocks.length}
               slotsBooked={summary.slotsBooked}
               weatherAlerts={(weatherQ.data as number | null) ?? 0}
+              inquiries={(inquiriesQ.data as number | null) ?? 0}
             />
             <TodaysJobs jobs={jobs} loading={jobsQ.loading} />
           </TabsContent>
@@ -119,15 +124,17 @@ function QuickGrid({
   blocks,
   slotsBooked,
   weatherAlerts,
+  inquiries,
 }: {
   blocks: number;
   slotsBooked: number;
   weatherAlerts: number;
+  inquiries: number;
 }) {
   const items = [
-    { to: "/compliance", icon: ShieldCheck, label: "Compliance", count: blocks, tone: blocks > 0 ? "warn" : ("brand" as const) },
+    { to: "/jobs?state=inquiry", icon: Inbox, label: "Inquiries", count: inquiries, tone: inquiries > 0 ? ("warn" as const) : ("brand" as const) },
+    { to: "/compliance", icon: ShieldCheck, label: "Compliance", count: blocks, tone: blocks > 0 ? ("warn" as const) : ("brand" as const) },
     { to: "/jobs?weather=alert", icon: Cloud, label: "Weather", count: weatherAlerts, tone: weatherAlerts > 0 ? ("warn" as const) : ("brand" as const) },
-    { to: "/fleet", icon: Plane, label: "Drone fleet", count: "Fleet", tone: "brand" as const },
     { to: "/slots", icon: Calendar, label: "Schedule", count: slotsBooked, tone: "brand" as const },
   ];
   return (

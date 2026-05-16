@@ -14,6 +14,9 @@ export type JobRow = {
   area: number | null;
   area_acres: number;
   scheduled_date: string;
+  scheduled_date_end: string | null;
+  scheduled_time_start: string | null;
+  scheduled_time_end: string | null;
   state: JobState;
   village: string | null;
   spray_type: string | null;
@@ -41,7 +44,7 @@ export async function listJobs(opts: { from?: string; to?: string; state?: strin
   let q = supabase
     .from("jobs")
     .select(
-      "id, number, crop, area_acres, scheduled_date, state, village, pesticide_name, assigned_pilot_id, assigned_drone_id, override_reason, pricing_snapshot, weather_safety, weather_evaluated_at, farmer:farmers!farmer_id(id, name, phone, village)",
+      "id, number, crop, area_acres, scheduled_date, scheduled_date_end, scheduled_time_start, scheduled_time_end, state, village, pesticide_name, assigned_pilot_id, assigned_drone_id, override_reason, pricing_snapshot, weather_safety, weather_evaluated_at, farmer:farmers!farmer_id(id, name, phone, village)",
     )
     .order("scheduled_date", { ascending: true });
   if (opts.from) q = q.gte("scheduled_date", opts.from);
@@ -54,11 +57,11 @@ export async function getJob(id: string) {
   return supabase
     .from("jobs")
     .select(
-      "id, number, crop, area, area_acres, scheduled_date, state, village, spray_type, pesticide_name, assigned_pilot_id, assigned_drone_id, override_reason, pricing_snapshot, state_history, reschedule_count, farmer:farmers!farmer_id(id, name, phone, village, district, state, default_language)",
+      "id, tenant_id, number, crop, area, area_acres, scheduled_date, scheduled_date_end, scheduled_time_start, scheduled_time_end, state, village, spray_type, pesticide_name, assigned_pilot_id, assigned_drone_id, override_reason, pricing_snapshot, state_history, reschedule_count, farmer:farmers!farmer_id(id, name, phone, village, district, state, default_language)",
     )
     .eq("id", id)
     .maybeSingle()
-    .returns<JobRow | null>();
+    .returns<(JobRow & { tenant_id: string }) | null>();
 }
 
 export async function listSortiesForJob(jobId: string) {
@@ -228,6 +231,26 @@ export async function rescheduleJob(jobId: string, newDate: string, reason: stri
   return supabase.rpc("reschedule_job", {
     p_job_id: jobId,
     p_new_date: newDate,
+    p_reason: reason,
+  });
+}
+
+// Windowed reschedule — used by JobDetail's expanded picker when a time
+// window is being set on reschedule.
+export async function rescheduleJobWithWindow(
+  jobId: string,
+  newDate: string,
+  newDateEnd: string,
+  timeStart: string | null,
+  timeEnd: string | null,
+  reason: string,
+) {
+  return supabase.rpc("reschedule_job", {
+    p_job_id: jobId,
+    p_new_date: newDate,
+    p_new_date_end: newDateEnd,
+    p_time_start: timeStart,
+    p_time_end: timeEnd,
     p_reason: reason,
   });
 }
@@ -415,4 +438,101 @@ export async function weatherAlertsCount() {
     .in("weather_safety", ["marginal", "unsafe"])
     .gte("scheduled_date", today)
     .lte("scheduled_date", horizon);
+}
+
+// ---------- Chunk F: windowed bookings & inquiries ----------
+
+export type WindowConflict = {
+  ok: boolean;
+  out_of_hours: boolean;
+  working_hours?: { start: string; end: string };
+  blocks: Array<{ id: string; time_start: string; time_end: string; reason: string | null }>;
+  jobs: Array<{ id: string; number: string; state: string; time_start: string; time_end: string }>;
+  reason?: string;
+};
+
+export async function checkWindowConflict(
+  tenantId: string,
+  date: string,
+  timeStart: string | null,
+  timeEnd: string | null,
+  excludeJobId?: string,
+) {
+  // The generated types don't model nullable RPC args; cast through to avoid
+  // forcing callers to supply dummy times when they want "all day".
+  return supabase
+    .rpc("check_window_conflict", {
+      p_tenant_id: tenantId,
+      p_date: date,
+      p_time_start: timeStart as unknown as string,
+      p_time_end: timeEnd as unknown as string,
+      p_exclude_job_id: (excludeJobId ?? null) as unknown as string,
+    })
+    .returns<WindowConflict>();
+}
+
+export async function confirmInquiry(
+  jobId: string,
+  timeStart: string,
+  timeEnd: string,
+  dateEnd?: string | null,
+) {
+  return supabase.rpc("confirm_inquiry", {
+    p_job_id: jobId,
+    p_time_start: timeStart,
+    p_time_end: timeEnd,
+    p_date_end: (dateEnd ?? null) as unknown as string,
+  });
+}
+
+export async function sendInquiryConfirmation(jobId: string) {
+  return supabase.functions.invoke("telegram-send-confirmation", { body: { job_id: jobId } });
+}
+
+// Slot blocks (admin blocked windows on a date)
+export type SlotBlock = {
+  id: string;
+  date: string;
+  time_start: string;
+  time_end: string;
+  reason: string | null;
+  created_at: string;
+};
+
+export async function listSlotBlocks(from: string, to: string) {
+  return supabase
+    .from("slot_blocks")
+    .select("id, date, time_start, time_end, reason, created_at")
+    .gte("date", from)
+    .lte("date", to)
+    .order("date")
+    .order("time_start")
+    .returns<SlotBlock[]>();
+}
+
+export async function createSlotBlock(args: {
+  date: string;
+  time_start: string;
+  time_end: string;
+  reason?: string;
+  tenant_id: string;
+}) {
+  return supabase.from("slot_blocks").insert({
+    date: args.date,
+    time_start: args.time_start,
+    time_end: args.time_end,
+    reason: args.reason ?? null,
+    tenant_id: args.tenant_id,
+  });
+}
+
+export async function deleteSlotBlock(id: string) {
+  return supabase.from("slot_blocks").delete().eq("id", id);
+}
+
+export async function inquiryCount() {
+  return supabase
+    .from("jobs")
+    .select("id", { count: "exact", head: true })
+    .eq("state", "inquiry");
 }

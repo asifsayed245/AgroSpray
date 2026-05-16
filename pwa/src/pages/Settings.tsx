@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   ScrollText,
   Save,
+  Clock,
 } from "lucide-react";
 import { TopBar } from "@/components/layout/TopBar";
 import { Card, CardSubtitle } from "@/components/ui/card";
@@ -53,6 +54,7 @@ export default function Settings() {
           <div className="-mx-4 overflow-x-auto px-4">
             <TabsList className="w-max">
               <TabsTrigger value="business"><Building2 className="h-3.5 w-3.5" /> Business</TabsTrigger>
+              <TabsTrigger value="ops"><Clock className="h-3.5 w-3.5" /> Operations</TabsTrigger>
               <TabsTrigger value="telegram"><Send className="h-3.5 w-3.5" /> Telegram</TabsTrigger>
               <TabsTrigger value="pricing"><Receipt className="h-3.5 w-3.5" /> Pricing</TabsTrigger>
               <TabsTrigger value="users"><Users className="h-3.5 w-3.5" /> Users</TabsTrigger>
@@ -65,6 +67,10 @@ export default function Settings() {
 
           <TabsContent value="business">
             <BusinessTab tenantId={t?.id} initial={t} />
+          </TabsContent>
+
+          <TabsContent value="ops">
+            <OperationsTab tenantId={t?.id} initial={t} />
           </TabsContent>
 
           <TabsContent value="telegram">
@@ -120,6 +126,44 @@ export default function Settings() {
 }
 
 type Tenant = NonNullable<Awaited<ReturnType<typeof getTenant>>["data"]>;
+
+function OperationsTab({ tenantId, initial }: { tenantId?: string; initial?: Tenant | null }) {
+  const [start, setStart] = useState<string>(((initial as { working_hours_start?: string } | null)?.working_hours_start ?? "06:00:00").slice(0, 5));
+  const [end, setEnd] = useState<string>(((initial as { working_hours_end?: string } | null)?.working_hours_end ?? "18:00:00").slice(0, 5));
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  async function save() {
+    if (!tenantId) return;
+    setSaving(true);
+    setSaved(false);
+    await supabase
+      .from("tenants")
+      .update({ working_hours_start: start, working_hours_end: end })
+      .eq("id", tenantId);
+    setSaving(false);
+    setSaved(true);
+  }
+
+  return (
+    <Card>
+      <div className="row">
+        <IconTile tone="brand"><Clock className="h-5 w-5" /></IconTile>
+        <CardSubtitle>
+          Daily window for drone spray ops. Used to validate booking times — anything outside is flagged as "out of hours".
+        </CardSubtitle>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <Input label="Start" type="time" value={start} onChange={(e) => setStart(e.target.value)} />
+        <Input label="End" type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
+      </div>
+      <Button block className="mt-4" onClick={save} disabled={saving}>
+        <Save className="h-4 w-4" /> {saving ? "Saving…" : "Save"}
+      </Button>
+      {saved && <div className="mt-2 text-[11px] text-mint-700">Saved.</div>}
+    </Card>
+  );
+}
 
 function BusinessTab({ tenantId, initial }: { tenantId?: string; initial?: Tenant | null }) {
   const [form, setForm] = useState({
